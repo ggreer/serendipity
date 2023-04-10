@@ -1,6 +1,8 @@
 import React from 'react';
 import classNames from 'classnames';
 
+import { SettingsContext } from './Settings';
+
 type VideosProps = {};
 type VideosState = {
   cameraStream?: MediaStream,
@@ -11,26 +13,30 @@ type VideosState = {
 // TODO: check support for media APIs
 const video_width = 640;
 const video_height = 480;
-const snapshot_interval = 10 * 1000;
+const snapshot_interval = 60 * 1000;
 
 export class Videos extends React.Component<VideosProps, VideosState> {
   canvasSelfRef = React.createRef<HTMLCanvasElement>();
   videoSelfRef = React.createRef<HTMLVideoElement>();
-  cameraStream?: MediaStream;
+  // cameraStream?: MediaStream;
   snapshotInterval: any;
 
-  state = {
+  state: VideosState = {
     cameraStream: undefined,
     snapshotData: undefined,
     isVideoChatting: false,
   };
 
+  static contextType = SettingsContext;
+  context!: React.ContextType<typeof SettingsContext>;
+
   constructor (props: VideosProps) {
     super(props);
-    this.cameraStream = undefined;
+    // this.cameraStream = undefined;
   }
 
   componentDidMount () {
+    // connect to server and get list of other users
   }
 
   componentWillUnmount () {
@@ -53,15 +59,14 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    let cameraStream = this.cameraStream;
+    let { cameraStream } = this.state;
     if (!cameraStream) {
       cameraStream = await this.startCamera();
-      console.log("snapshot: Not snapshotting because video stream is on.");
 
       this.videoSelfRef.current.srcObject = cameraStream;
       this.videoSelfRef.current?.play();
 
-      // Cameras take a second or two to "warm up" (get correct exposure)
+      // Most cameras take a second or two to "warm up" (get correct exposure)
       console.log("warming up...");
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
       console.log("warmed up");
@@ -75,29 +80,31 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.setState({
       snapshotData: data,
     })
-    // this..setAttribute("src", data);
-
-    // this.stopCamera();
-    // setTimeout(() => this.snapshot(), snapshot_interval);
   }
 
   async startCamera (constraints?: MediaStreamConstraints): Promise<MediaStream> {
     const cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        // facingMode: "user", // Prefer selfie cam if on mobile
+        video: {
+          facingMode: "user", // Prefer selfie cam if on mobile
+          deviceId: this.context.camera,
+        },
         ...constraints,
       });
-    this.cameraStream = cameraStream;
-    console.log(this.cameraStream);
+    this.setState({
+      cameraStream,
+    })
     return cameraStream;
   }
 
   stopCamera () {
-    if (!this.cameraStream) {
+    const { cameraStream } = this.state;
+    if (!cameraStream) {
       return;
     }
-    this.cameraStream.getTracks().forEach(track => track.stop());
-    this.cameraStream = undefined;
+    cameraStream.getTracks().forEach(track => track.stop());
+    this.setState({
+      cameraStream: undefined,
+    })
   }
 
   async startVideo () {
@@ -121,43 +128,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   render () {
+    const { cameraStream, snapshotData, isVideoChatting } = this.state;
+
     return <div className="Videos">
-      <button type="button" onClick={() => this.start()}>Start</button>
-      <button type="button" onClick={() => this.stop()}>Turn off camera</button>
+      <button type="button" onClick={() => this.start()} disabled={!!cameraStream}>Turn on camera</button>
+      <button type="button" onClick={() => this.stop()} disabled={!cameraStream}>Turn off camera</button>
       <canvas id="canvas_self" ref={this.canvasSelfRef} />
-      <img id="img_self" src={this.state.snapshotData} style={{ display: this.state.snapshotData ? "visible" : "none" }} />
-      <video id="video_self" ref={this.videoSelfRef} style={{ display: this.state.isVideoChatting ? "visible" : "none" }} width="300" muted />
+      <img id="img_self" src={snapshotData} style={{ display: snapshotData ? "visible" : "none" }} />
+      <video id="video_self" ref={this.videoSelfRef} style={{ display: isVideoChatting ? "visible" : "none" }} width="300" muted />
       <button type="button" onClick={() => this.startVideo()}>Start</button>
       <button type="button" onClick={() => this.stopVideo()}>Stop</button>
     </div>;
   }
 }
-
-/*
-
-let self_camera_stream = null;
-const video_self = document.getElementById("video_self");
-const img_self = document.getElementById("img_self");
-const canvas_self = document.getElementById("canvas_self")
-
-canvas_self.setAttribute("width", video_width);
-canvas_self.setAttribute("height", video_height);
-img_self.setAttribute("width", video_width);
-img_self.setAttribute("height", video_height);
-
-let snapshot_interval = null;
-
-async function snapshot () {
-
-}
-
-snapshot();
-snapshot_interval = setInterval(snapshot, 60 * 1000);
-
-
-async function startCamera (constraints) {
-
-}
-
-
-*/

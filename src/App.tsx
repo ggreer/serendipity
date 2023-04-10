@@ -3,12 +3,14 @@ import logo from './logo.svg';
 import './App.css';
 
 import { Videos } from './Videos';
-import { Settings } from './Settings';
+import { Settings, SettingsProvider } from './Settings';
 
 
 export const App = () => {
   return <div className="App">
-    <Settings />
-    <Videos />
+    <SettingsProvider>
+      <Settings />
+      <Videos />
+    </SettingsProvider>
   </div>;
 }
