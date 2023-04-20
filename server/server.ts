@@ -82,7 +82,7 @@ class Connection {
   constructor (ws: WebSocket, req: IncomingMessage) {
     this.ws = ws;
     this.req = req;
-    this.id = `user_${ids++}`;
+    this.id = `userid_${ids++}`;
     this.isAlive = true;
     console.log(`Connection from ${this.toString()}`);
 
@@ -122,7 +122,7 @@ class Connection {
     });
 
     // TODO: set username based on auth
-    this.name = `user_${this.id}`;
+    this.name = this.id;
     this.snapshot = "";
 
     // TODO: route room and auth based on req path

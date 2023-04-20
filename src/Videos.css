@@ -1,4 +1,17 @@
+#canvas_self {
+  display: none;
+}
+
 #chat {
   height: 300px;
   border: 1px magenta solid;
+}
+
+.user_image {
+  width: 320px;
+  height: 240px;
+}
+
+.user_tile {
+  width: 320px;
 }

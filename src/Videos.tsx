@@ -29,16 +29,20 @@ class Socket {
   }
 
   connect () {
+    console.log("connecting to ", this.url);
     this.ws = new WebSocket(this.url);
     this.ws.onerror = e => this.reconnect(e);
     this.ws.onclose = e => this.reconnect(e);
     this.ws.onmessage = e => this.handleMsg(e);
+    this.ws.onopen = e => {
+      console.log("connection opened to", this.url);
+    };
   }
 
   async reconnect (e: Event|CloseEvent) {
     this.wsErrors++;
     this.wsReqId = 0;
-    const wait = Math.pow(1500, this.wsErrors);
+    const wait = Math.pow(1.5, this.wsErrors) * 1000;
     console.error("Websocket error", e);
     console.error(`Reconnecting in ${wait}ms`);
     await new Promise<void>((resolve) => setTimeout(() => resolve(), wait));
@@ -52,13 +56,18 @@ class Socket {
   destroy () {
     const { ws } = this;
     if (!ws) {
+      console.debug("no websocket. not destroying");
       return;
     }
     ws.onerror = null;
     ws.onclose = null;
     ws.onmessage = null;
     ws.close();
-    // ws.
+    if (ws.readyState in [WebSocket.CONNECTING, WebSocket.CLOSING, WebSocket.CLOSED]) {
+      console.log("socket destroy: doing nothing because websocket is in state", ws.readyState);
+      return;
+    }
+    // WebSocket.OPEN
   }
 
   send (msg: Omit<ClientMessage, "req_id">) {
@@ -70,6 +79,9 @@ class Socket {
       this.send(msg);
     }
     if (ws.readyState !== WebSocket.OPEN) {
+      if (ws.onopen) {
+        console.error("OMG ALREADY ONOPEN");
+      }
       ws.onopen = onReady;
       return;
     }
@@ -89,6 +101,8 @@ class Socket {
     this.handler = handler;
   }
 }
+
+const socket = new Socket("ws://localhost:4000/ws");
 
 type UserWithSnapshot = User & { snapshot?: string };
 
@@ -128,13 +142,13 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
   constructor (props: VideosProps) {
     super(props);
-    this.socket = new Socket("ws://localhost:4000/ws");
+    this.socket = socket;
+    this.socket.setHandler(msg => this.handleMsg(msg));
   }
 
   componentDidMount () {
     console.log("mounted");
     this.socket.connect();
-    this.socket.setHandler(msg => this.handleMsg(msg));
   }
 
   componentWillUnmount () {
@@ -219,17 +233,31 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.log("warmed up");
     }
 
-    const context = this.canvasSelfRef.current.getContext("2d") as CanvasRenderingContext2D;
-    this.canvasSelfRef.current.width = video_width;
-    this.canvasSelfRef.current.height = video_height;
-    context.drawImage(this.videoSelfRef.current, 0, 0, video_width, video_height);
-    const data = this.canvasSelfRef.current.toDataURL("image/png");
+    const context = this.canvasSelfRef.current.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
+    const canvas = this.canvasSelfRef.current;
+    canvas.width = video_width/2;
+    canvas.height = video_height/2;
+    context.drawImage(this.videoSelfRef.current, 0, 0, canvas.width, canvas.height);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      // weighted average of RGB values to mimic human color perception. We see greens much better than we see blues or reds.
+      const luminosity =
+        0.21 * data[i] +
+        0.72 * data[i + 1] +
+        0.07 * data[i + 2];
+      data[i] = luminosity;
+      data[i + 1] = luminosity;
+      data[i + 2] = luminosity;
+    }
+    context.putImageData(imageData, 0, 0);
+    const dataUrl = this.canvasSelfRef.current.toDataURL("image/jpeg");
     this.setState({
-      snapshotData: data,
+      snapshotData: dataUrl,
     });
     this.socket.send({
       cmd: "snapshot",
-      data,
+      data: dataUrl,
     });
   }
 
@@ -255,10 +283,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     cameraStream.getTracks().forEach(track => track.stop());
     this.setState({
       cameraStream: undefined,
-    })
+      snapshotData: "",
+    });
+    // clear latest snapshot for everyone else
+    this.socket.send({
+      cmd: "snapshot",
+      data: "",
+    });
   }
 
-  async startVideo () {
+  async startVideo (user?: User) {
     if (!this.videoSelfRef.current) {
       return;
     }
@@ -267,7 +301,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     // this.videoSelfRef.current.muted = false;
   }
 
-  stopVideo () {
+  stopVideo (user?: User) {
     if (!this.videoSelfRef.current) {
       return;
     }
@@ -299,14 +333,23 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         ? <button type="button" onClick={() => this.stop()} disabled={!cameraStream}>Turn off camera</button>
         : <button type="button" onClick={() => this.start()} disabled={!!cameraStream}>Turn on camera</button>
       }
-      <canvas id="canvas_self" ref={this.canvasSelfRef} />
-      { Object.values(users).map((u, i) => <UserTile user={u} />) }
+      &nbsp;&nbsp;&nbsp;
+      { isVideoChatting
+        ? <button type="button" onClick={() => this.stopVideo()}>Stop all video chat</button>
+        : <button type="button" onClick={() => this.startVideo()}>Start all video chat</button>
+      }
+      <br />
+      Canvas: <canvas id="canvas_self" ref={this.canvasSelfRef} />
+      Image: <img id="img_self" className="user_image" src={snapshotData || `${process.env.PUBLIC_URL}/portrait_placeholder.png`} />
 
-      <img id="img_self" src={snapshotData} style={{ display: snapshotData ? "visible" : "none" }} />
+
       <video id="video_self" ref={this.videoSelfRef} style={{ display: isVideoChatting ? "visible" : "none" }} width="300" muted />
-      <button type="button" onClick={() => this.startVideo()}>Start</button>
-      <button type="button" onClick={() => this.stopVideo()}>Stop</button>
 
+      <br />
+      <hr />
+      <br />
+
+      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={false} onClick={() => this.startVideo(u)} />) }
       <ul id="user_list">
         { Object.values(users).map((u, i) => <li key={i}>{ u.name }</li>) }
       </ul>
@@ -322,9 +365,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 }
 
-const UserTile = ({ user }: { user: UserWithSnapshot }) => {
-  return <div>
-    <img src={user.snapshot} />
-    { user.name }
+const UserTile = ({ user, isSelf, onClick }: { user: UserWithSnapshot, isSelf: boolean, onClick: () => void }) => {
+  return <div className="user_tile" onClick={onClick}>
+    <img className="user_image" src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.png`} />
+    { user.name } { isSelf ? "(You)" : "" }
   </div>
 };
