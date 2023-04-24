@@ -1,5 +1,6 @@
+export type UserId = string;
 export interface User {
-  user_id: string;
+  user_id: UserId;
   name: string;
 }
 
@@ -7,6 +8,8 @@ const commonCommands = [
   "error",
   "msg",
   "snapshot",
+  "start_video",
+  "stop_video",
 ] as const;
 
 const clientCommands = [
@@ -31,29 +34,40 @@ export type ErrorInfo = string;
 
 export type ClientSnapshotInfo = string; //base64'd snapshot
 export interface ServerSnapshotInfo {
-  user_id: string;
+  user_id: UserId;
   snapshot: string;
 }
 
 export interface UserJoinInfo extends User { }
 export interface UserLeaveInfo extends User { }
 export interface RoomInfo {
-  users: Record<string, User & ServerSnapshotInfo>;
+  you: UserId
+  users: Record<UserId, User & ServerSnapshotInfo>;
 }
 export interface ServerMsgInfo {
   user: User;
   msg: string;
 }
 
+export interface StartVideoInfo {
+  from: UserId;
+  to: UserId;
+  pc_description: string;
+}
+export interface StopVideoInfo {
+  from: UserId;
+  to: UserId;
+}
+
 
 export interface ClientMessage {
   req_id: string;
   cmd: ClientCommand;
-  data: ClientMsgInfo | ClientSnapshotInfo | ErrorInfo;
+  data: ErrorInfo | StartVideoInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo;
 }
 
 export interface ServerMessage {
   res_id?: string;
   cmd: ServerCommand;
-  data: ErrorInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo;
+  data: ErrorInfo | StartVideoInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo;
 }

@@ -5,10 +5,12 @@ import { WebSocket, WebSocketServer } from "ws";
 import type {
   ClientMessage,
   ClientMsgInfo,
-  ServerMessage,
   ClientSnapshotInfo,
+  ServerMessage,
+  ServerSnapshotInfo,
+  StartVideoInfo,
+  StopVideoInfo,
   User,
-  ServerSnapshotInfo
 } from "../src/protocol";
 
 
@@ -139,6 +141,7 @@ class Connection {
       cmd: "room_info",
       data: {
         users: roomInfo,
+        you: this.id,
       },
     });
   }
@@ -164,6 +167,9 @@ class Connection {
       return;
     }
     switch (msg.cmd) {
+      case "error":
+        console.error(`Error from ${this.toString()}`);
+        break;
       case "msg":
         room.send({
           cmd: "msg",
@@ -182,8 +188,26 @@ class Connection {
           },
         });
         break;
-      case "error":
-        console.error(`Error from ${this.toString()}`);
+      case "start_video":
+        const startVideoInfo = (msg.data as StartVideoInfo);
+        room.send({
+          cmd: "start_video",
+          data: {
+            from: this.id,
+            to: startVideoInfo.to,
+            pc_description: startVideoInfo.pc_description,
+          },
+        });
+        break;
+      case "stop_video":
+        const stopVideoInfo = (msg.data as StopVideoInfo);
+        room.send({
+          cmd: "stop_video",
+          data: {
+            from: this.id,
+            to: stopVideoInfo.to,
+          },
+        });
         break;
       default:
         this.respond(msg.req_id, { cmd: "error", data: "Unknown command" });
