@@ -11,7 +11,9 @@ import type {
   ServerMessage,
   ServerMsgInfo,
   ServerSnapshotInfo,
-  StartVideoInfo,
+  OfferVideoInfo,
+  AcceptVideoInfo,
+  IceCandidateInfo,
   StopVideoInfo,
   User,
   UserId,
@@ -25,10 +27,12 @@ import { Socket, socket } from './socket';
 type UserWithSnapshot = User & { snapshot?: string };
 
 type VideosProps = {};
+type VideoState = "off" | "snapshot" | "on";
 type VideosState = {
+  id: UserId,
   cameraStream?: MediaStream,
   snapshotData?: string,
-  isVideoChatting: boolean,
+  videoState: VideoState,
   messages: Array<ServerMessage>,
   users: Record<string, UserWithSnapshot>,
 };
@@ -39,9 +43,14 @@ const video_height = 480;
 const snapshot_interval = 60 * 1000;
 
 const config = {
-  // iceServers: [{ urls: "stun:stun.mystunserver.tld" }],
+  iceServers: [
+    { urls: ["stun:stun.l.google.com:19302"] },
+    { urls: ["turns:turn.floobits.com:5349"],
+      username: "floobits",
+      credential: "stiboolf",
+    },
+  ],
 };
-
 
 export class Videos extends React.Component<VideosProps, VideosState> {
   canvasSelfRef = React.createRef<HTMLCanvasElement>();
@@ -51,12 +60,13 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   snapshotInterval: any;
   socket: Socket;
   // ws?: WebSocket;
-  id: UserId;
+  pcs: Record<UserId, RTCPeerConnection>;
 
   state: VideosState = {
+    id: "",
     cameraStream: undefined,
     snapshotData: undefined,
-    isVideoChatting: false,
+    videoState: "off",
     messages: [],
     users: {},
   };
@@ -66,7 +76,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
   constructor (props: VideosProps) {
     super(props);
-    this.id = "";
+    this.pcs = {};
     this.socket = socket;
     this.socket.setHandler(msg => this.handleMsg(msg));
   }
@@ -89,13 +99,20 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
     switch (msg.cmd) {
       case "room_info":
-        const room_info = msg.data as RoomInfo;
-        this.id = room_info.you;
+        const roomInfo = msg.data as RoomInfo;
         this.setState({
-          users: room_info.users,
+          users: roomInfo.users,
+          id: roomInfo.you,
         });
       break;
-      case "start_video":
+      case "offer_video":
+        this.handleOfferVideo(msg.data as OfferVideoInfo);
+      break;
+      case "accept_video":
+        this.handleAcceptVideo(msg.data as AcceptVideoInfo);
+      break;
+      case "ice_candidate":
+        this.handleIceCandidate(msg.data as IceCandidateInfo);
       break;
       case "stop_video":
       break;
@@ -202,7 +219,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           facingMode: "user", // Prefer selfie cam if on mobile
           deviceId: this.context.camera,
         },
-        ...constraints,
+        audio: true,
       });
     this.setState({
       cameraStream,
@@ -233,8 +250,20 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
+    if (!user) {
+      for (const [id, user] of Object.entries(this.state.users)) {
+        await this.startVideo(user);
+      }
+      return;
+    }
+
+    if (user.user_id === this.state.id) {
+      console.warn("not starting video chat with self");
+      return;
+    }
+
     // TODO: fix this logic to work with multiple users
-    if (this.state.isVideoChatting) {
+    if (this.state.videoState === "on") {
       console.error("already video chatting");
       return;
     }
@@ -242,21 +271,108 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.videoSelfRef.current.srcObject = cameraStream;
     this.videoSelfRef.current.play();
     this.setState({
-      isVideoChatting: true,
+      cameraStream,
+      videoState: "on",
     });
 
     const pc = new RTCPeerConnection(config);
     for (const track of cameraStream.getTracks()) {
       pc.addTrack(track, cameraStream);
     }
-    this.socket.send({
-      cmd: "start_video",
-      data: {
-        from: this.id,
-        to: user?.user_id ?? "",
-        pc_description: JSON.stringify(pc.localDescription),
+    this.pcs[user.user_id] = pc;
+
+    // const offer = await pc.createOffer();
+    pc.onnegotiationneeded = async () => {
+      // await pc.setLocalDescription(offer);
+      await pc.setLocalDescription();
+      this.socket.send({
+        cmd: "offer_video",
+        data: {
+          from: this.state.id, // server ignores this
+          to: user?.user_id ?? "",
+          pc_description: JSON.stringify(pc.localDescription),
+        }
+      });
+    }
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === "failed") {
+        pc.restartIce();
+        // maybe send to socket?
       }
+    };
+    pc.onicecandidate = ({ candidate }) => {
+      socket.send({
+        cmd: "ice_candidate",
+        data: {
+          to: user.user_id,
+          from: this.state.id,
+          candidate: JSON.stringify(candidate),
+        },
+      });
+    };
+
+  }
+
+  async handleOfferVideo (ovi: OfferVideoInfo) {
+    // someone wants to video chat with us
+    if (ovi.from === this.state.id) {
+      console.log("offer video from self. ignoring");
+      return;
+    }
+    if (ovi.to !== this.state.id) {
+      console.log("offer video to someone else. ignoring")
+      return;
+    }
+
+    const cameraStream = await this.startCamera({ audio: true });
+    if (!this.videoSelfRef.current) {
+      console.error("No video ref");
+      return;
+    }
+    this.videoSelfRef.current.srcObject = cameraStream;
+    this.videoSelfRef.current.play();
+    this.setState({
+      cameraStream,
+      videoState: "on",
     });
+
+    const pc = this.pcs[ovi.from];
+    await pc.setRemoteDescription(JSON.parse(ovi.pc_description));
+
+    this.socket.send({
+      cmd: "accept_video",
+      data: {
+        from: this.state.id,
+        to: ovi.from,
+        pc_description: JSON.stringify(pc.localDescription),
+      },
+    });
+  }
+
+  async handleAcceptVideo (avi: AcceptVideoInfo) {
+    if (avi.from === this.state.id) {
+      console.log("accept video from self. ignoring");
+      return;
+    }
+    if (avi.to !== this.state.id) {
+      console.log("accept video to someone else. ignoring")
+      return;
+    }
+    const pc = this.pcs[avi.from];
+    await pc.setRemoteDescription(JSON.parse(avi.pc_description));
+  }
+
+  async handleIceCandidate (ici: IceCandidateInfo) {
+    if (ici.from === this.state.id) {
+      console.log("accept video from self. ignoring");
+      return;
+    }
+    if (ici.to !== this.state.id) {
+      console.log("accept video to someone else. ignoring")
+      return;
+    }
+    const pc = this.pcs[ici.from];
+    await pc.addIceCandidate(JSON.parse(ici.candidate));
   }
 
   stopVideo (user?: User) {
@@ -267,7 +383,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.videoSelfRef.current.pause();
     this.videoSelfRef.current.srcObject = null;
     this.setState({
-      isVideoChatting: false,
+      videoState: "off",
     });
 
     this.stopCamera();
@@ -287,7 +403,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   render () {
-    const { cameraStream, snapshotData, isVideoChatting, messages, users } = this.state;
+    const { cameraStream, snapshotData, videoState, messages, users, id } = this.state;
 
     return <div className="Videos">
       { cameraStream
@@ -295,7 +411,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         : <button type="button" onClick={() => this.startSnapshots()} disabled={!!cameraStream}>Turn on camera</button>
       }
       &nbsp;&nbsp;&nbsp;
-      { isVideoChatting
+      { videoState === "on"
         ? <button type="button" onClick={() => this.stopVideo()}>Stop all video chat</button>
         : <button type="button" onClick={() => this.startVideo()}>Start all video chat</button>
       }
@@ -304,13 +420,13 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       Image: <img id="img_self" className="user_image" src={snapshotData || `${process.env.PUBLIC_URL}/portrait_placeholder.png`} />
 
 
-      <video id="video_self" ref={this.videoSelfRef} style={{ display: isVideoChatting ? "visible" : "none" }} width="300" muted />
+      <video id="video_self" ref={this.videoSelfRef} style={{ visibility: videoState === "on" ? "visible" : "hidden" }} width="300" muted />
 
       <br />
       <hr />
       <br />
 
-      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={false} onClick={() => this.startVideo(u)} />) }
+      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={u.user_id === id } onClick={() => this.startVideo(u)} />) }
       <ul id="user_list">
         { Object.values(users).map((u, i) => <li key={i}>{ u.name }</li>) }
       </ul>
@@ -345,8 +461,11 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
         case "msg":
           return <code key={i}>{ (data as ServerMsgInfo).user.name }: { (data as ServerMsgInfo).msg }<br /></code>;
           break;
-        case "start_video":
-          return <code key={i}>{ (data as StartVideoInfo).from } started video chat with { (data as StartVideoInfo).to }<br /></code>;
+        case "offer_video":
+          return <code key={i}>{ (data as OfferVideoInfo).from } offered video chat to { (data as OfferVideoInfo).to || "everyone" }<br /></code>;
+          break;
+        case "accept_video":
+          return <code key={i}>{ (data as AcceptVideoInfo).from } accepted video chat with { (data as AcceptVideoInfo).to }<br /></code>;
           break;
         case "stop_video":
           return <code key={i}>{ (data as StopVideoInfo).from } stopped video chat with { (data as StopVideoInfo).to }<br /></code>;

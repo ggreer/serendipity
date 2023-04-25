@@ -8,7 +8,9 @@ const commonCommands = [
   "error",
   "msg",
   "snapshot",
-  "start_video",
+  "accept_video",
+  "offer_video",
+  "ice_candidate",
   "stop_video",
 ] as const;
 
@@ -49,10 +51,20 @@ export interface ServerMsgInfo {
   msg: string;
 }
 
-export interface StartVideoInfo {
+export interface OfferVideoInfo {
   from: UserId;
   to: UserId;
   pc_description: string;
+}
+export interface AcceptVideoInfo {
+  from: UserId;
+  to: UserId;
+  pc_description: string;
+}
+export interface IceCandidateInfo {
+  from: UserId;
+  to: UserId;
+  candidate: string;
 }
 export interface StopVideoInfo {
   from: UserId;
@@ -63,11 +75,11 @@ export interface StopVideoInfo {
 export interface ClientMessage {
   req_id: string;
   cmd: ClientCommand;
-  data: ErrorInfo | StartVideoInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo;
 }
 
 export interface ServerMessage {
   res_id?: string;
   cmd: ServerCommand;
-  data: ErrorInfo | StartVideoInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo;
 }

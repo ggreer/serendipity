@@ -16,3 +16,7 @@
   width: 320px;
   cursor: pointer;
 }
+
+#video_self {
+  border: 1px magenta solid;
+}

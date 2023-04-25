@@ -8,7 +8,9 @@ import type {
   ClientSnapshotInfo,
   ServerMessage,
   ServerSnapshotInfo,
-  StartVideoInfo,
+  OfferVideoInfo,
+  AcceptVideoInfo,
+  IceCandidateInfo,
   StopVideoInfo,
   User,
 } from "../src/protocol";
@@ -188,14 +190,36 @@ class Connection {
           },
         });
         break;
-      case "start_video":
-        const startVideoInfo = (msg.data as StartVideoInfo);
+      case "offer_video":
+        const ovi = (msg.data as OfferVideoInfo);
         room.send({
-          cmd: "start_video",
+          cmd: "offer_video",
           data: {
             from: this.id,
-            to: startVideoInfo.to,
-            pc_description: startVideoInfo.pc_description,
+            to: ovi.to,
+            pc_description: ovi.pc_description,
+          },
+        });
+        break;
+      case "accept_video":
+        const avi = (msg.data as AcceptVideoInfo);
+        room.send({
+          cmd: "accept_video",
+          data: {
+            from: this.id,
+            to: avi.to,
+            pc_description: avi.pc_description,
+          },
+        });
+        break;
+      case "ice_candidate":
+        const ici = (msg.data as IceCandidateInfo);
+        room.send({
+          cmd: "ice_candidate",
+          data: {
+            from: this.id,
+            to: ici.to,
+            candidate: ici.candidate,
           },
         });
         break;

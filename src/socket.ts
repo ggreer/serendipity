@@ -7,6 +7,7 @@ export class Socket {
   wsErrors = 0;
   wsReqId = 0;
   handler?: (a: ClientMessage) => void;
+  onOpenMsgs: Array<Omit<ClientMessage, "req_id">> = [];
 
   constructor (url: string) {
     this.url = url;
@@ -14,12 +15,17 @@ export class Socket {
 
   connect () {
     console.log("connecting to ", this.url);
+    this.onOpenMsgs = [];
     this.ws = new WebSocket(this.url);
     this.ws.onerror = e => this.reconnect(e);
     this.ws.onclose = e => this.reconnect(e);
     this.ws.onmessage = e => this.handleMsg(e);
     this.ws.onopen = e => {
       console.log("connection opened to", this.url);
+      for (const m of this.onOpenMsgs) {
+        this.send(m);
+      }
+      this.onOpenMsgs = [];
     };
   }
 
@@ -59,16 +65,12 @@ export class Socket {
     if (!ws) {
       throw new Error("Can't send before connecting!");
     }
-    const onReady = () => {
-      this.send(msg);
-    }
     if (ws.readyState !== WebSocket.OPEN) {
-      if (ws.onopen) {
-        console.error("OMG ALREADY ONOPEN");
-      }
-      ws.onopen = onReady;
+      this.onOpenMsgs.push(msg);
+      console.debug(ws.readyState, "queued", msg);
       return;
     }
+    console.log("sending", msg);
     ws.send(JSON.stringify({ ...msg, req_id: `req_${this.wsReqId++}`, }));
   }
 
@@ -77,7 +79,7 @@ export class Socket {
     if (!this.handler) {
       return;
     }
-    console.log(msg);
+    console.log("got", msg);
     this.handler(msg);
   }
 
