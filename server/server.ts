@@ -13,6 +13,7 @@ import type {
   IceCandidateInfo,
   StopVideoInfo,
   User,
+  UserId,
 } from "../src/protocol";
 
 
@@ -54,8 +55,11 @@ class Room {
     this.conns = {};
   }
 
-  send (msg: Omit<ServerMessage, "res_id">) {
+  send (msg: Omit<ServerMessage, "res_id">, from?: UserId) {
     for (const [id, conn] of Object.entries(this.conns)) {
+      if (id === from) {
+        continue;
+      }
       conn.send(msg);
     }
   }
@@ -179,16 +183,18 @@ class Connection {
             user: { user_id: this.id, name: this.name },
             msg: (msg.data as ClientMsgInfo),
           },
-        });
+        }, this.id);
         break;
       case "snapshot":
+        const snapshot = (msg.data as ClientSnapshotInfo);
         room.send({
           cmd: "snapshot",
           data: {
             user_id: this.id,
-            snapshot: (msg.data as ClientSnapshotInfo),
+            snapshot,
           },
-        });
+        }, this.id);
+        this.snapshot = snapshot;
         break;
       case "offer_video":
         const ovi = (msg.data as OfferVideoInfo);
@@ -199,7 +205,7 @@ class Connection {
             to: ovi.to,
             pc_description: ovi.pc_description,
           },
-        });
+        }, this.id);
         break;
       case "accept_video":
         const avi = (msg.data as AcceptVideoInfo);
@@ -210,7 +216,7 @@ class Connection {
             to: avi.to,
             pc_description: avi.pc_description,
           },
-        });
+        }, this.id);
         break;
       case "ice_candidate":
         const ici = (msg.data as IceCandidateInfo);
@@ -221,7 +227,7 @@ class Connection {
             to: ici.to,
             candidate: ici.candidate,
           },
-        });
+        }, this.id);
         break;
       case "stop_video":
         const stopVideoInfo = (msg.data as StopVideoInfo);
@@ -231,7 +237,7 @@ class Connection {
             from: this.id,
             to: stopVideoInfo.to,
           },
-        });
+        }, this.id);
         break;
       default:
         this.respond(msg.req_id, { cmd: "error", data: "Unknown command" });
