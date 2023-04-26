@@ -88,4 +88,4 @@ export class Socket {
   }
 }
 
-export const socket = new Socket("ws://localhost:4000/ws");
+export const socket = new Socket(`ws://${document.location.hostname}:4000/ws`);

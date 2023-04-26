@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { VideoHTMLAttributes, useEffect, useRef } from 'react'
 import classNames from 'classnames';
 
 import './Videos.css';
@@ -24,17 +24,19 @@ import type {
 import { Socket, socket } from './socket';
 
 
-type UserWithSnapshot = User & { snapshot?: string };
+type UserWithData = User & {
+  snapshot?: string,
+  mediaStream?: MediaStream,
+};
 
 type VideosProps = {};
 type VideoState = "off" | "snapshot" | "on";
 type VideosState = {
   id: UserId,
   cameraStream?: MediaStream,
-  snapshotData?: string,
   videoState: VideoState,
   messages: Array<ServerMessage>,
-  users: Record<string, UserWithSnapshot>,
+  users: Record<string, UserWithData>,
 };
 
 // TODO: check support for media APIs
@@ -65,7 +67,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   state: VideosState = {
     id: "",
     cameraStream: undefined,
-    snapshotData: undefined,
     videoState: "off",
     messages: [],
     users: {},
@@ -84,6 +85,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   componentDidMount () {
     console.log("mounted");
     this.socket.connect();
+    this.startSnapshots();
   }
 
   componentWillUnmount () {
@@ -121,7 +123,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       case "join":
         const userJoinInfo = (msg.data as UserJoinInfo);
         this.setState({
-          users: { ...this.state.users, [userJoinInfo.user_id]: userJoinInfo },
+          users: { ...this.state.users, [userJoinInfo.user_id]: {...userJoinInfo } },
         });
       break;
       case "leave":
@@ -201,9 +203,18 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
     context.putImageData(imageData, 0, 0);
     const dataUrl = this.canvasSelfRef.current.toDataURL("image/jpeg");
-    this.setState({
-      snapshotData: dataUrl,
+    this.setState(prevState => {
+      return {
+        users: {
+          ...prevState.users,
+          [prevState.id]: {
+            ...prevState.users[prevState.id],
+            snapshot: dataUrl,
+          },
+        },
+      }
     });
+
     this.socket.send({
       cmd: "snapshot",
       data: dataUrl,
@@ -233,15 +244,68 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
     cameraStream.getTracks().forEach(track => track.stop());
-    this.setState({
-      cameraStream: undefined,
-      snapshotData: "",
+    this.setState(prevState => {
+      return {
+        cameraStream: undefined,
+        users: {
+          ...prevState.users,
+          [prevState.id]: {
+            ...prevState.users[prevState.id],
+            snapshot: "",
+          },
+        },
+      }
     });
+
     // clear latest snapshot for everyone else
     this.socket.send({
       cmd: "snapshot",
       data: "",
     });
+  }
+
+  setupPeerConnection (pc: RTCPeerConnection, userId: UserId) {
+    //TODO: check if this already exists
+    this.pcs[userId] = pc;
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ice connection state change", pc.iceConnectionState);
+      if (pc.iceConnectionState === "failed") {
+        console.warn("failed. restarting ice");
+        pc.restartIce();
+        // maybe send to socket?
+      }
+    };
+    pc.onicecandidate = ({ candidate }) => {
+      if (!candidate) {
+        console.log("no candidate");
+        return;
+      }
+      socket.send({
+        cmd: "ice_candidate",
+        data: {
+          to: userId,
+          from: this.state.id,
+          candidate: JSON.stringify(candidate),
+        },
+      });
+    };
+    pc.ontrack = ({ track, streams }) => {
+      console.log("new track", track, "streams:", streams);
+      track.onunmute = () => {
+        console.log("unmuted track", track);
+        const u = this.state.users[userId];
+        this.setState({
+          users: { ...this.state.users, [userId]: {...u, mediaStream: streams[0] } },
+        });
+        const videoElem = document.getElementById(`video_${userId}`);
+        if (videoElem) {
+          (videoElem as HTMLVideoElement).srcObject = streams[0];
+        } else {
+          console.warn("no video elem", `video_${userId}`);
+        }
+      };
+    };
   }
 
   async startVideo (user?: User) {
@@ -279,11 +343,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     for (const track of cameraStream.getTracks()) {
       pc.addTrack(track, cameraStream);
     }
-    this.pcs[user.user_id] = pc;
 
-    // const offer = await pc.createOffer();
+    this.setupPeerConnection(pc, user.user_id);
     pc.onnegotiationneeded = async () => {
-      // await pc.setLocalDescription(offer);
       await pc.setLocalDescription();
       this.socket.send({
         cmd: "offer_video",
@@ -294,23 +356,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         }
       });
     }
-    pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "failed") {
-        pc.restartIce();
-        // maybe send to socket?
-      }
-    };
-    pc.onicecandidate = ({ candidate }) => {
-      socket.send({
-        cmd: "ice_candidate",
-        data: {
-          to: user.user_id,
-          from: this.state.id,
-          candidate: JSON.stringify(candidate),
-        },
-      });
-    };
-
   }
 
   async handleOfferVideo (ovi: OfferVideoInfo) {
@@ -324,11 +369,12 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    const cameraStream = await this.startCamera({ audio: true });
     if (!this.videoSelfRef.current) {
       console.error("No video ref");
       return;
     }
+
+    const cameraStream = await this.startCamera({ audio: true });
     this.videoSelfRef.current.srcObject = cameraStream;
     this.videoSelfRef.current.play();
     this.setState({
@@ -336,9 +382,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       videoState: "on",
     });
 
-    const pc = this.pcs[ovi.from];
-    await pc.setRemoteDescription(JSON.parse(ovi.pc_description));
+    const pc = new RTCPeerConnection(config);
+    for (const track of cameraStream.getTracks()) {
+      pc.addTrack(track, cameraStream);
+    }
 
+    this.setupPeerConnection(pc, ovi.from);
+    await pc.setRemoteDescription(JSON.parse(ovi.pc_description));
+    await pc.setLocalDescription();
+
+    // pc.onnegotiationneeded = async () => {
     this.socket.send({
       cmd: "accept_video",
       data: {
@@ -347,6 +400,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         pc_description: JSON.stringify(pc.localDescription),
       },
     });
+    // }
   }
 
   async handleAcceptVideo (avi: AcceptVideoInfo) {
@@ -359,20 +413,30 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
     const pc = this.pcs[avi.from];
-    await pc.setRemoteDescription(JSON.parse(avi.pc_description));
+    const description = JSON.parse(avi.pc_description);
+    // if (description.type === "offer") {
+    //   return;
+    // }
+    await pc.setRemoteDescription(description);
   }
 
   async handleIceCandidate (ici: IceCandidateInfo) {
     if (ici.from === this.state.id) {
-      console.log("accept video from self. ignoring");
+      console.log("ice candidate from self. ignoring");
       return;
     }
     if (ici.to !== this.state.id) {
-      console.log("accept video to someone else. ignoring")
+      console.log("ice candidate to someone else. ignoring")
       return;
     }
     const pc = this.pcs[ici.from];
-    await pc.addIceCandidate(JSON.parse(ici.candidate));
+
+    if (!pc) {
+      console.error("no peer connection for", ici.from, this.pcs);
+      return;
+    }
+    const candidate = new RTCIceCandidate(JSON.parse(ici.candidate));
+    await pc.addIceCandidate(candidate);
   }
 
   stopVideo (user?: User) {
@@ -403,7 +467,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   render () {
-    const { cameraStream, snapshotData, videoState, messages, users, id } = this.state;
+    const { cameraStream, videoState, messages, users, id } = this.state;
 
     return <div className="Videos">
       { cameraStream
@@ -415,13 +479,8 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         ? <button type="button" onClick={() => this.stopVideo()}>Stop all video chat</button>
         : <button type="button" onClick={() => this.startVideo()}>Start all video chat</button>
       }
-      <br />
-      Canvas: <canvas id="canvas_self" ref={this.canvasSelfRef} />
-      Image: <img id="img_self" className="user_image" src={snapshotData || `${process.env.PUBLIC_URL}/portrait_placeholder.png`} />
-
-
-      <video id="video_self" ref={this.videoSelfRef} style={{ visibility: videoState === "on" ? "visible" : "hidden" }} width="300" muted />
-
+      <canvas id="canvas_self" ref={this.canvasSelfRef} />
+      <video id="video_self" ref={this.videoSelfRef} style={{ display: videoState === "on" ? undefined : "none" }} width="300" muted />
       <br />
       <hr />
       <br />
@@ -440,9 +499,37 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 }
 
-const UserTile = ({ user, isSelf, onClick }: { user: UserWithSnapshot, isSelf: boolean, onClick: () => void }) => {
+type VideoProps = VideoHTMLAttributes<HTMLVideoElement> & {
+  srcObject?: MediaStream
+}
+
+const Video = ({ srcObject, ...props }: VideoProps) => {
+  const refVideo = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    if (!refVideo.current || !srcObject) {
+      return;
+    }
+    refVideo.current.srcObject = srcObject;
+    refVideo.current.play();
+  }, [srcObject])
+
+  return <video ref={refVideo} {...props} />
+};
+
+const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boolean, onClick: () => void }) => {
+  const showVideo = user.mediaStream;
   return <div className="user_tile" onClick={onClick}>
-    <img className="user_image" src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.png`} />
+    <Video
+      id={`video_${user.user_id}`}
+      width="300"
+      srcObject={user.mediaStream}
+      style={{ display: showVideo ? undefined : "none" }}
+    />
+    <img
+      className="user_image"
+      src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.png`}
+      style={{ display: showVideo ? "none" : undefined }}
+    />
     { user.name } { isSelf ? "(You)" : "" }
   </div>;
 };
