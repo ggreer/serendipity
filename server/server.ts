@@ -21,7 +21,7 @@ let ids = 0;
 
 
 const wss = new WebSocketServer({
-  port: 4000,
+  port: parseInt(process.env.PORT || "") || 4000,
   perMessageDeflate: {
     zlibDeflateOptions: {
       // See zlib defaults.
@@ -183,7 +183,7 @@ class Connection {
             user: { user_id: this.id, name: this.name },
             msg: (msg.data as ClientMsgInfo),
           },
-        }, this.id);
+        });
         break;
       case "snapshot":
         const snapshot = (msg.data as ClientSnapshotInfo);
