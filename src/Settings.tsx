@@ -1,9 +1,12 @@
 import React, { createContext, useContext, useEffect, useState, useReducer } from 'react';
 
+import './Settings.css';
+
 const defaultSettings = {
   camera: "",
   microphone: "",
   speaker: "",
+  autoSnapshot: false,
 };
 
 try {
@@ -11,6 +14,7 @@ try {
   defaultSettings.camera = settings.camera;
   defaultSettings.microphone = settings.microphone;
   defaultSettings.speaker = settings.speaker;
+  defaultSettings.autoSnapshot = settings.autoSnapshot;
 } catch (e) {
   console.error(e);
 }
@@ -36,6 +40,18 @@ function settingsReducer (settings=defaultSettings, action: Action) {
         microphone: action.value,
       }
     break;
+    case "setSpeaker":
+      settings = {
+        ...settings,
+        speaker: action.value,
+      }
+    break;
+    case "setAutoSnapshot":
+      settings = {
+        ...settings,
+        autoSnapshot: action.value === "true" ? true : false,
+      }
+    break;
   }
   localStorage.setItem("settings", JSON.stringify(settings));
   return settings;
@@ -54,20 +70,69 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   </SettingsContext.Provider>;
 }
 
+type Permissions = {
+  camera: PermissionState,
+  microphone: PermissionState,
+  autoplay: PermissionState,
+}
+
+export async function getPermissions (): Promise<Permissions> {
+  const cameraPermission = await navigator.permissions.query({ name: "camera" as PermissionName });
+  const micPermission = await navigator.permissions.query({ name: "microphone" as PermissionName });
+  // const autoplayPermission = await navigator.permissions.query({ name: "autoplay" as PermissionName });
+  return {
+    camera: cameraPermission.state,
+    microphone: micPermission.state,
+    autoplay: "granted", // TODO: figure out if brave exposes autoplay permission
+  };
+}
+
+const Permission = ({ value }: { value: PermissionState }) => {
+  if (value === "prompt") {
+    return <>❔</>;
+  }
+  if (value === "denied") {
+    return <>❌</>;
+  }
+  if (value === "granted") {
+    return <>✅</>;
+  }
+  return <>❔❔</>;
+}
+
 export const Settings = () => {
   const settings = useContext(SettingsContext);
   const dispatch = useContext(SettingsDispatchContext);
   const [isOpen, setOpen] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [permissions, setPermissions] = useState<Permissions>({
+    camera: "prompt",
+    microphone: "prompt",
+    autoplay: "prompt",
+  });
 
   useEffect(() => {
     async function enumerateDevices () {
       const deviceList = await navigator.mediaDevices?.enumerateDevices();
-      setDevices(deviceList);
+      if (deviceList) {
+        setDevices(deviceList);
+      }
     }
     if (!devices.length) {
       enumerateDevices();
     }
+  }, [devices.length]);
+
+  useEffect(() => {
+    async function getAndSetPermissions () {
+      const permissions = await getPermissions();
+      setPermissions({
+        camera: permissions.camera,
+        microphone: permissions.microphone,
+        autoplay: permissions.autoplay,
+      });
+    }
+    getAndSetPermissions();
   }, []);
 
 
@@ -91,27 +156,46 @@ export const Settings = () => {
     }
   });
 
-  const settingsContent = <>
-    <label htmlFor="camera-select">Camera</label>
-    <select name="camera" id="camera-select" defaultValue={settings.camera} onChange={e => dispatch({ type: "setCamera", value: e.target.value})}>
-      { cameras }
-    </select>
-    <br />
-
-    <label htmlFor="microphone-select">Microphone</label>
-    <select name="microphone" id="microphone-select" defaultValue={settings.microphone} onChange={e => dispatch({ type: "setMicrophone", value: e.target.value})}>
-      { microphones }
-    </select>
-    <br />
-
-    <label htmlFor="speaker-select">Speaker</label>
-    <select name="speaker" id="speaker-select" defaultValue={settings.speaker} onChange={e => dispatch({ type: "setSpeaker", value: e.target.value})}>
-      { speakers }
-    </select>
-  </>;
-
   return <>
-    <div className="settings" onClick={() => setOpen(!isOpen)}>⚙ Settings</div>
-    { isOpen && settingsContent }
+    <button type="button" className="settings" onClick={() => setOpen(!isOpen)}>⚙ Settings</button>
+    <dialog open={isOpen}>
+      <h2>Settings</h2>
+      <form method="dialog">
+        <fieldset>
+          <legend>Options</legend>
+          <input type="checkbox" name="auto-snapshot" id="settings-auto-snapshot" defaultChecked={settings.autoSnapshot} onChange={e => dispatch({ type: "setAutoSnapshot", value: e.target.checked ? "true" : "false"})} />
+          <label htmlFor="settings-auto-snapshot">Automatically enable camera</label>
+        </fieldset>
+
+        <fieldset>
+          <legend>Audio/Video</legend>
+          <label htmlFor="settings-camera-select">📷 Camera</label>
+          <select name="camera" id="settings-camera-select" defaultValue={settings.camera} onChange={e => dispatch({ type: "setCamera", value: e.target.value})}>
+            { cameras }
+          </select>
+          <div className="break" />
+
+          <label htmlFor="settings-microphone-select">🎤 Microphone</label>
+          <select name="microphone" id="settings-microphone-select" defaultValue={settings.microphone} onChange={e => dispatch({ type: "setMicrophone", value: e.target.value})}>
+            { microphones }
+          </select>
+          <div className="break" />
+
+          <label htmlFor="settings-speaker-select">🔉 Speaker</label>
+          <select name="speaker" id="settings-speaker-select" defaultValue={settings.speaker} onChange={e => dispatch({ type: "setSpeaker", value: e.target.value})}>
+            { speakers }
+          </select>
+        </fieldset>
+
+        <fieldset>
+          <legend>Permissions</legend>
+          <Permission value={permissions.camera} /> <label>Camera access</label><br />
+          <Permission value={permissions.microphone} /> <label>Microphone access</label><br />
+          <Permission value={permissions.autoplay} /> <label>Video autoplay</label><br />
+        </fieldset>
+
+        <button type="button" onClick={() => setOpen(false)}>Close</button>
+      </form>
+      </dialog>
   </>;
 }
