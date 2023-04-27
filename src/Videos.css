@@ -4,19 +4,46 @@
 
 #chat {
   height: 300px;
-  border: 1px magenta solid;
+  border: 1px black solid;
+  overflow-y: auto;
+}
+#chat-box {
+  display: flex;
+  flex-direction: row;
+}
+#chat-box > input {
+  flex-grow: 1;
+  border-style: solid;
+}
+#chat-box > button {
+  height: 100%;
+  margin: 0;
+  padding: 0 10px;
+  border-style: solid;
 }
 
-.user_image {
-  width: 320px;
-  height: 240px;
+.user_image, .user_video {
+  width: 240px;
+  height: 180px;
 }
 
 .user_tile {
-  width: 320px;
+  width: 240px;
   cursor: pointer;
+  display: inline-block;
+  border: 1px black solid;
+  margin: 0 10px 10px 0;
 }
+.user_tile.self {
+  border: 1px blue solid;
+}
+.user
 
 #video_self {
   border: 1px magenta solid;
+}
+
+button {
+  min-height: 30px;
+  margin: 0 10px 10px 0;
 }

@@ -7,7 +7,7 @@ import { Settings, SettingsProvider } from './Settings';
 
 
 export const App = () => {
-  return <div className="App">
+  return <div className="app">
     <SettingsProvider>
       <Settings />
       <Videos />

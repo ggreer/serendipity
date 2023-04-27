@@ -3,7 +3,7 @@ import classNames from 'classnames';
 
 import './Videos.css';
 
-import { SettingsContext } from './Settings';
+import { SettingsContext, getPermissions } from './Settings';
 
 import type {
   ClientMessage,
@@ -85,7 +85,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   componentDidMount () {
     console.log("mounted");
     this.socket.connect();
-    this.startSnapshots();
+
+    const maybeStartSnapshots = async () => {
+      const { camera, microphone } = await getPermissions();
+      if (camera === "granted" && microphone === "granted") {
+        this.startSnapshots();
+      }
+    }
+    if (this.context.autoSnapshot) {
+      maybeStartSnapshots();
+    }
   }
 
   componentWillUnmount () {
@@ -117,6 +126,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         this.handleIceCandidate(msg.data as IceCandidateInfo);
       break;
       case "stop_video":
+        const stopVideoInfo = (msg.data as StopVideoInfo);
+        const user = this.state.users[stopVideoInfo.from];
+        this.stopVideo(user);
       break;
       case "msg":
       break;
@@ -240,13 +252,17 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
   stopCamera () {
     const { cameraStream } = this.state;
-    if (!cameraStream) {
-      return;
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
     }
-    cameraStream.getTracks().forEach(track => track.stop());
+    if (this.videoSelfRef.current) {
+      this.videoSelfRef.current.pause();
+      this.videoSelfRef.current.srcObject = null;
+    }
     this.setState(prevState => {
       return {
         cameraStream: undefined,
+        videoState: "off",
         users: {
           ...prevState.users,
           [prevState.id]: {
@@ -256,6 +272,8 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         },
       }
     });
+
+    // TODO: stop video chats that we're in
 
     // clear latest snapshot for everyone else
     this.socket.send({
@@ -308,6 +326,36 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     };
   }
 
+  destroyPeerConnection (userId: UserId) {
+    const pc = this.pcs[userId];
+    const user = this.state.users[userId];
+    console.log(`Destroying peer connection for ${userId}`);
+    if (!pc) {
+      console.error(`Peer connection for ${userId} doesn't exist.`);
+      return;
+      // throw new Error(`Peer connection for ${userId} doesn't exist.`);
+    }
+
+    pc.ontrack = null;
+    pc.onicecandidate = null;
+    pc.oniceconnectionstatechange = null;
+    pc.onsignalingstatechange = null;
+    pc.onicegatheringstatechange = null;
+    pc.onnegotiationneeded = null;
+
+    if (user.mediaStream) {
+      for (const track of user.mediaStream.getTracks()) {
+        track.stop();
+      }
+    }
+
+    pc.close();
+    delete this.pcs[userId];
+    this.setState({
+      users: { ...this.state.users, [userId]: {...user, mediaStream: undefined } },
+    });
+  }
+
   async startVideo (user?: User) {
     if (!this.videoSelfRef.current) {
       console.error("No video ref");
@@ -355,6 +403,14 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           pc_description: JSON.stringify(pc.localDescription),
         }
       });
+    }
+  }
+
+  async toggleVideo (user: UserWithData) {
+    if (user.mediaStream) {
+      await this.stopVideo(user);
+    } else {
+      await this.startVideo(user);
     }
   }
 
@@ -439,18 +495,21 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     await pc.addIceCandidate(candidate);
   }
 
-  stopVideo (user?: User) {
-    if (!this.videoSelfRef.current) {
+  stopVideo (user?: UserWithData) {
+    if (!user) {
+      for (const [id, user] of Object.entries(this.state.users)) {
+        this.stopVideo(user);
+      }
       return;
     }
-    // this.videoSelfRef.current.muted = true;
-    this.videoSelfRef.current.pause();
-    this.videoSelfRef.current.srcObject = null;
-    this.setState({
-      videoState: "off",
-    });
 
-    this.stopCamera();
+    this.destroyPeerConnection(user.user_id);
+
+    if (Object.values(this.pcs).length === 0) {
+      this.setState({
+        videoState: "snapshot",
+      });
+    }
   }
 
   sendMessage (e: React.FormEvent<HTMLFormElement>) {
@@ -469,12 +528,11 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   render () {
     const { cameraStream, videoState, messages, users, id } = this.state;
 
-    return <div className="Videos">
+    return <div className="videos">
       { cameraStream
         ? <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Turn off camera</button>
         : <button type="button" onClick={() => this.startSnapshots()} disabled={!!cameraStream}>Turn on camera</button>
       }
-      &nbsp;&nbsp;&nbsp;
       { videoState === "on"
         ? <button type="button" onClick={() => this.stopVideo()}>Stop all video chat</button>
         : <button type="button" onClick={() => this.startVideo()}>Start all video chat</button>
@@ -482,16 +540,15 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       <canvas id="canvas_self" ref={this.canvasSelfRef} />
       <video id="video_self" ref={this.videoSelfRef} style={{ display: videoState === "on" ? undefined : "none" }} width="300" muted />
       <br />
-      <hr />
-      <br />
-
-      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={u.user_id === id } onClick={() => this.startVideo(u)} />) }
-      <ul id="user_list">
+{/*      <ul id="user_list">
         { Object.values(users).map((u, i) => <li key={i}>{ u.name }</li>) }
       </ul>
+*/}
+      {/*<UserTile key={u.user_id} user={u} isSelf={u.user_id === id } onClick={() => this.toggleVideo(u)} />*/}
+      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={u.user_id === id } onClick={() => this.toggleVideo(u)} />) }
 
       <Messages messages={messages} />
-      <form onSubmit={e => this.sendMessage(e)}>
+      <form id="chat-box" onSubmit={e => this.sendMessage(e)}>
         <input type="text" ref={this.messageInputRef} />
         <button type="submit">Send</button>
       </form>
@@ -518,10 +575,10 @@ const Video = ({ srcObject, ...props }: VideoProps) => {
 
 const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boolean, onClick: () => void }) => {
   const showVideo = user.mediaStream;
-  return <div className="user_tile" onClick={onClick}>
+  return <div className={classNames("user_tile", { self: isSelf })} onClick={onClick}>
     <Video
+      className="user_video"
       id={`video_${user.user_id}`}
-      width="300"
       srcObject={user.mediaStream}
       style={{ display: showVideo ? undefined : "none" }}
     />
@@ -552,7 +609,7 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
           return <code key={i}>{ (data as OfferVideoInfo).from } offered video chat to { (data as OfferVideoInfo).to || "everyone" }<br /></code>;
           break;
         case "accept_video":
-          return <code key={i}>{ (data as AcceptVideoInfo).from } accepted video chat with { (data as AcceptVideoInfo).to }<br /></code>;
+          return <code key={i}>{ (data as AcceptVideoInfo).from } accepted video chat from { (data as AcceptVideoInfo).to }<br /></code>;
           break;
         case "stop_video":
           return <code key={i}>{ (data as StopVideoInfo).from } stopped video chat with { (data as StopVideoInfo).to }<br /></code>;
