@@ -30,9 +30,10 @@ export class Socket {
   }
 
   async reconnect (e: Event|CloseEvent) {
+    this.destroy();
     this.wsErrors++;
     this.wsReqId = 0;
-    const wait = Math.pow(1.5, this.wsErrors) * 1000;
+    const wait = Math.min(Math.pow(1.5, this.wsErrors) * 1000, 10000);
     console.error("Websocket error", e);
     console.error(`Reconnecting in ${wait}ms`);
     await new Promise<void>((resolve) => setTimeout(() => resolve(), wait));
