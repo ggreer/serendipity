@@ -1,4 +1,6 @@
-import { IncomingMessage } from "http";
+import { createServer } from "http";
+import type { IncomingMessage } from "http";
+import { parse } from "url";
 
 import { WebSocket, WebSocketServer } from "ws";
 
@@ -19,9 +21,8 @@ import type {
 
 let ids = 0;
 
-
 const wss = new WebSocketServer({
-  port: parseInt(process.env.PORT || "") || 4000,
+  noServer: true,
   perMessageDeflate: {
     zlibDeflateOptions: {
       // See zlib defaults.
@@ -40,12 +41,33 @@ const wss = new WebSocketServer({
     concurrencyLimit: 10, // Limits zlib concurrency for perf.
     threshold: 1024 // Size (in bytes) below which messages
     // should not be compressed if context takeover is disabled.
-  }
-});
-wss.on("listening", () => {
-  console.log("listening", wss.address());
+  },
 });
 
+const server = createServer((req, res) => {
+  const { pathname } = parse(req.url ?? "");
+  if (pathname === "/healthz") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ status: "OK" }));
+    return;
+  }
+  res.writeHead(400, { "Content-Type": "text/plain" });
+  res.end("bad request");
+});
+server.on("listening", () => {
+  console.log("listening", server.address());
+});
+server.on("upgrade", (req, socket, head) => {
+  const { pathname } = parse(req.url ?? "");
+  if (pathname === "/ws") {
+    wss.handleUpgrade(req, socket, head, function done(ws) {
+      wss.emit("connection", ws, req);
+    });
+  } else {
+    socket.destroy();
+  }
+});
+server.listen(parseInt(process.env.PORT || "") || 4000);
 
 
 class Room {

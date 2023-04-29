@@ -7,9 +7,9 @@
 # docker run -it --init -p 3000:80 server:latest
 
 # Deploy me with:
-# aws --region us-east-1 ecr get-login-password | docker login --username AWS --password-stdin blahblahblah.dkr.ecr.us-east-1.amazonaws.com
-# docker tag server:latest blahblahblah.dkr.ecr.us-east-1.amazonaws.com/server:latest
-# docker push blahblahblah.dkr.ecr.us-east-1.amazonaws.com/server:latest
+# aws --region us-west-2 ecr get-login-password | docker login --username AWS --password-stdin 745623752863.dkr.ecr.us-west-2.amazonaws.com/server
+# docker tag server:latest 745623752863.dkr.ecr.us-west-2.amazonaws.com/server:latest
+# docker push 745623752863.dkr.ecr.us-west-2.amazonaws.com/server:latest
 
 
 # Build deps without dev dependencies
