@@ -2,32 +2,32 @@
 type DTMFs = Array<[number, number, number]>;
 
 export function playDTMF (dtmfs: DTMFs) {
-  console.log("playing");
   const context = new AudioContext();
   const gain = new GainNode(context, {
-    gain: 0.3,
+    gain: 0.35,
   });
   gain.connect(context.destination);
+
+  const os1 = new OscillatorNode(context, {
+    type: "triangle",
+  });
+  const os2 = new OscillatorNode(context, {
+    type: "triangle",
+  });
+  os1.connect(gain);
+  os2.connect(gain);
 
   let currentTime = 0;
 
   for (const [freq1, freq2, duration] of dtmfs) {
-    const os1 = new OscillatorNode(context, {
-      frequency: freq1,
-      type: "sine",
-    });
-    const os2 = new OscillatorNode(context, {
-      frequency: freq2,
-      type: "sine",
-    });
-    os1.connect(gain);
-    os2.connect(gain);
-    os1.start(currentTime);
-    os2.start(currentTime);
-    os1.stop(currentTime + duration);
-    os2.stop(currentTime + duration);
+    os1.frequency.setValueAtTime(freq1, currentTime);
+    os2.frequency.setValueAtTime(freq2, currentTime);
     currentTime += duration;
   }
+  os1.start(0);
+  os2.start(0);
+  os1.stop(currentTime);
+  os2.stop(currentTime);
 }
 
 export function playStartVideo () {
