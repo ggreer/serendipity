@@ -6,7 +6,7 @@ import './Videos.css';
 import { SettingsContext, getPermissions } from './Settings';
 
 import type {
-  ClientMessage,
+  ErrorInfo,
   RoomInfo,
   ServerMessage,
   ServerMsgInfo,
@@ -179,7 +179,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
   async snapshot () {
     if (!this.videoSelfRef.current || !this.canvasSelfRef.current) {
-      console.error("WTF", this.videoSelfRef.current, this.canvasSelfRef.current);
+      console.error("No refs for video or canvas", this.videoSelfRef.current, this.canvasSelfRef.current);
       return;
     }
 
@@ -569,6 +569,14 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     const { cameraStream, videoState, messages, users, id } = this.state;
     const me = users[id];
 
+    let userContent = <>Connecting...</>;
+    if (id && me) {
+      userContent = <>
+        { <UserTile user={me} isSelf={true} onClick={() => this.snapshot()} /> }
+        { Object.values(users).map((u, i) => u.user_id === id ? <span key={u.user_id}></span> : <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} />) }
+      </>;
+    }
+
     return <div className="videos">
       { cameraStream
         ? <>
@@ -584,9 +592,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       <canvas id="canvas_self" ref={this.canvasSelfRef} />
       <video id="video_self" ref={this.videoSelfRef} style={{ display: "none" }} width="300" muted />
       <br />
-      {/*<UserTile user={me} isSelf={true} onClick={() => this.toggleVideo(me)} />*/}
-      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} />) }
-
+      { userContent }
       <Messages messages={messages} />
       <form id="chat-box" onSubmit={e => this.sendMessage(e)}>
         <input type="text" ref={this.messageInputRef} />
@@ -624,6 +630,7 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
     />
     <img
       className="user_image"
+      alt={user.name}
       src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.png`}
       style={{ display: showVideo ? "none" : undefined }}
     />
@@ -638,22 +645,27 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
       switch (cmd) {
         case "join":
           return <code key={i}>{ (data as UserJoinInfo).name } joined<br /></code>;
-          break;
         case "leave":
           return <code key={i}>{ (data as UserLeaveInfo).name } left<br /></code>;
-          break;
+        case "error":
+          return <code key={i}>ERROR: { (data as ErrorInfo) }<br /></code>;
         case "msg":
           return <code key={i}>{ (data as ServerMsgInfo).user.name }: { (data as ServerMsgInfo).msg }<br /></code>;
-          break;
         case "offer_video":
           return <code key={i}>{ (data as OfferVideoInfo).from } offered video chat to { (data as OfferVideoInfo).to || "everyone" }<br /></code>;
-          break;
         case "accept_video":
           return <code key={i}>{ (data as AcceptVideoInfo).from } accepted video chat from { (data as AcceptVideoInfo).to }<br /></code>;
-          break;
         case "stop_video":
           return <code key={i}>{ (data as StopVideoInfo).from } stopped video chat with { (data as StopVideoInfo).to }<br /></code>;
-          break;
+        case "room_info":
+          return <span key={i}></span>;
+        case "snapshot":
+          return <span key={i}></span>;
+        case "ice_candidate":
+          return <span key={i}></span>;
+        default:
+          const exhaustiveCheck: never = cmd;
+          throw new Error(`Unhandled case: ${exhaustiveCheck}`);
       }
     }) }
   </div>;

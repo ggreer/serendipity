@@ -8,6 +8,7 @@ export class Socket {
   wsReqId = 0;
   handler?: (a: ClientMessage) => void;
   onOpenMsgs: Array<Omit<ClientMessage, "req_id">> = [];
+  reconnectTimeout?: NodeJS.Timeout;
 
   constructor (url: string) {
     this.url = url;
@@ -30,14 +31,15 @@ export class Socket {
   }
 
   reconnect (e: Event|CloseEvent) {
-    this.destroy();
     this.wsErrors++;
     this.wsReqId = 0;
     const wait = Math.min(Math.pow(1.5, this.wsErrors) * 1000, 10000);
     console.error("Websocket error", e);
     console.error(`Reconnecting in ${wait}ms`);
+    this.destroy();
 
-    setTimeout(() => {
+    clearTimeout(this.reconnectTimeout);
+    this.reconnectTimeout = setTimeout(() => {
       if (this.ws?.readyState === WebSocket.CONNECTING) {
         console.log("websocket connecting. not trying to connect");
         return;
@@ -49,6 +51,8 @@ export class Socket {
 
   destroy () {
     const { ws } = this;
+    clearTimeout(this.reconnectTimeout);
+    this.reconnectTimeout = undefined;
     if (!ws) {
       console.debug("no websocket. not destroying");
       return;
@@ -56,11 +60,13 @@ export class Socket {
     ws.onerror = null;
     ws.onclose = null;
     ws.onmessage = null;
-    if (ws.readyState in [WebSocket.CONNECTING, WebSocket.CLOSING, WebSocket.CLOSED]) {
+    console.log("socket destroy: websocket is in state", ws.readyState);
+    if (ws.readyState in [WebSocket.CLOSING, WebSocket.CLOSED]) {
       console.log("socket destroy: doing nothing because websocket is in state", ws.readyState);
       return;
     }
     ws.close();
+    console.log("socket destroy: websocket is in state", ws.readyState);
   }
 
   send (msg: Omit<ClientMessage, "req_id">) {
@@ -91,5 +97,11 @@ export class Socket {
   }
 }
 
-export const socket = new Socket(`wss://${document.location.hostname}/ws${document.location.pathname}`);
-// export const socket = new Socket(`ws://${document.location.hostname}:4000/ws${document.location.pathname}`);
+const protocol = document.location.protocol === "http:" ? "ws:" : "wss:";
+let url = `${protocol}//${document.location.host}/ws${document.location.pathname}`;
+// if (process.env.NODE_ENV === "development") {
+//   url = `ws://${document.location.hostname}:4000/ws${document.location.pathname}`;
+//   // url = `wss://video.greer.fm/ws${document.location.pathname}`;
+// }
+
+export const socket = new Socket(url);
