@@ -26,6 +26,9 @@
   width: 240px;
   height: 180px;
 }
+.self > .user_image, .self > .user_video {
+  transform: scaleX(-1);
+}
 
 .user_tile {
   width: 240px;
@@ -36,11 +39,6 @@
 }
 .user_tile.self {
   border: 1px blue solid;
-}
-.user
-
-#video_self {
-  border: 1px magenta solid;
 }
 
 button {
