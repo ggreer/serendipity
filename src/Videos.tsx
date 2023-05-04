@@ -193,7 +193,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
       // Most cameras take a second or two to "warm up" (get correct exposure)
       console.log("warming up...");
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 2000));
+      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
       console.log("warmed up");
     }
 
