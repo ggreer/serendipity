@@ -403,18 +403,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
     const cameraStream = await this.startCamera({ audio: true });
-    if (this.state.videoState !== "on") {
-      this.videoSelfRef.current.srcObject = cameraStream;
-      this.videoSelfRef.current.play();
-      this.setState(prevState => {
-        const me = prevState.users[prevState.id];
-        return {
-          cameraStream,
-          videoState: "on",
-          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
-        };
-      });
-    }
+    this.playSelfVideo();
 
     const pc = new RTCPeerConnection(config);
     for (const track of cameraStream.getTracks()) {
@@ -431,6 +420,30 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           to: user?.user_id ?? "",
           pc_description: JSON.stringify(pc.localDescription),
         }
+      });
+    }
+  }
+
+  playSelfVideo () {
+    if (!this.videoSelfRef.current) {
+      console.error("No video ref");
+      return;
+    }
+    const { cameraStream, videoState } = this.state;
+    if (!cameraStream) {
+      console.error("No camera stream");
+      return;
+    }
+    if (videoState !== "on") {
+      this.videoSelfRef.current.srcObject = cameraStream;
+      this.videoSelfRef.current.play();
+      this.setState(prevState => {
+        const me = prevState.users[prevState.id];
+        return {
+          cameraStream,
+          videoState: "on",
+          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
+        };
       });
     }
   }
@@ -467,18 +480,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
 
     const cameraStream = await this.startCamera({ audio: true });
-    if (this.state.videoState !== "on") {
-      this.videoSelfRef.current.srcObject = cameraStream;
-      this.videoSelfRef.current.play();
-      this.setState(prevState => {
-        const me = prevState.users[prevState.id];
-        return {
-          cameraStream,
-          videoState: "on",
-          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
-        };
-      });
-    }
+    this.playSelfVideo();
 
     const pc = new RTCPeerConnection(config);
     for (const track of cameraStream.getTracks()) {
