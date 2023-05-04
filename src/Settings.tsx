@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useReducer } from 'react';
 
+import { playTestSound } from './sounds';
 import './Settings.css';
 
 const defaultSettings = {
@@ -8,6 +9,7 @@ const defaultSettings = {
   speaker: "",
   autoSnapshot: false,
   timeLapse: false,
+  playSounds: true,
 };
 
 try {
@@ -15,8 +17,9 @@ try {
   defaultSettings.camera = settings.camera;
   defaultSettings.microphone = settings.microphone;
   defaultSettings.speaker = settings.speaker;
-  defaultSettings.autoSnapshot = settings.autoSnapshot;
-  defaultSettings.timeLapse = settings.timeLapse;
+  defaultSettings.autoSnapshot = !!settings.autoSnapshot;
+  defaultSettings.timeLapse = !!settings.timeLapse;
+  defaultSettings.playSounds = !!settings.playSounds;
 } catch (e) {
   console.error("Error reading settings:", e);
   console.log("Using default settings.");
@@ -59,6 +62,12 @@ function settingsReducer (settings=defaultSettings, action: Action) {
       settings = {
         ...settings,
         timeLapse: action.value === "true" ? true : false,
+      }
+    break;
+    case "setPlaySounds":
+      settings = {
+        ...settings,
+        playSounds: action.value === "true" ? true : false,
       }
     break;
   }
@@ -175,6 +184,10 @@ export const Settings = () => {
           <legend>Options</legend>
           <input type="checkbox" name="auto-snapshot" id="settings-auto-snapshot" defaultChecked={settings.autoSnapshot} onChange={e => dispatch({ type: "setAutoSnapshot", value: e.target.checked ? "true" : "false"})} />
           <label htmlFor="settings-auto-snapshot">Automatically enable camera</label>
+          <div className="break" />
+
+          <input type="checkbox" name="play-sounds" id="settings-play-sounds" defaultChecked={settings.playSounds} onChange={e => dispatch({ type: "setPlaySounds", value: e.target.checked ? "true" : "false"})} />
+          <label htmlFor="settings-play-sounds">Play sounds when starting/stopping video chat</label>
         </fieldset>
 
         <fieldset>
@@ -195,6 +208,9 @@ export const Settings = () => {
           <select name="speaker" id="settings-speaker-select" value={settings.speaker} onChange={e => dispatch({ type: "setSpeaker", value: e.target.value})}>
             { speakers }
           </select>
+          <div className="break" />
+
+          <button type="button" onClick={() => playTestSound()}>Test speakers</button>
         </fieldset>
 
         <fieldset>

@@ -4,6 +4,7 @@ import classNames from 'classnames';
 import './Videos.css';
 
 import { SettingsContext, getPermissions } from './Settings';
+import { playStartVideo, playStopVideo } from './sounds';
 
 import type {
   ErrorInfo,
@@ -318,6 +319,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.log("new track", track, "streams:", streams);
       track.onunmute = () => {
         console.log("unmuted track", track);
+        // only play the sound once
+        if (track.kind === "audio") {
+          playStartVideo();
+        }
         this.setState(prevState => {
           const u = prevState.users[userId];
           return {
@@ -337,6 +342,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
     if (user.mediaStream) {
+      playStopVideo();
       for (const track of user.mediaStream.getTracks()) {
         track.stop();
       }
