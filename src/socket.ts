@@ -99,9 +99,9 @@ export class Socket {
 
 const protocol = document.location.protocol === "http:" ? "ws:" : "wss:";
 let url = `${protocol}//${document.location.host}/ws${document.location.pathname}`;
-// if (process.env.NODE_ENV === "development") {
-//   url = `ws://${document.location.hostname}:4000/ws${document.location.pathname}`;
-//   // url = `wss://video.greer.fm/ws${document.location.pathname}`;
-// }
+if (process.env.NODE_ENV === "development") {
+  url = `ws://${document.location.hostname}:4000/ws${document.location.pathname}`;
+  // url = `wss://video.greer.fm/ws${document.location.pathname}`;
+}
 
 export const socket = new Socket(url);
