@@ -180,19 +180,19 @@ export const Settings = () => {
         <fieldset>
           <legend>Audio/Video</legend>
           <label htmlFor="settings-camera-select">📷 Camera</label>
-          <select name="camera" id="settings-camera-select" defaultValue={settings.camera} onChange={e => dispatch({ type: "setCamera", value: e.target.value})}>
+          <select name="camera" id="settings-camera-select" value={settings.camera} onChange={e => dispatch({ type: "setCamera", value: e.target.value})}>
             { cameras }
           </select>
           <div className="break" />
 
           <label htmlFor="settings-microphone-select">🎤 Microphone</label>
-          <select name="microphone" id="settings-microphone-select" defaultValue={settings.microphone} onChange={e => dispatch({ type: "setMicrophone", value: e.target.value})}>
+          <select name="microphone" id="settings-microphone-select" value={settings.microphone} onChange={e => dispatch({ type: "setMicrophone", value: e.target.value})}>
             { microphones }
           </select>
           <div className="break" />
 
           <label htmlFor="settings-speaker-select">🔉 Speaker</label>
-          <select name="speaker" id="settings-speaker-select" defaultValue={settings.speaker} onChange={e => dispatch({ type: "setSpeaker", value: e.target.value})}>
+          <select name="speaker" id="settings-speaker-select" value={settings.speaker} onChange={e => dispatch({ type: "setSpeaker", value: e.target.value})}>
             { speakers }
           </select>
         </fieldset>
