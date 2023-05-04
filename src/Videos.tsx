@@ -268,6 +268,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           [prevState.id]: {
             ...prevState.users[prevState.id],
             snapshot: "",
+            mediaStream: undefined,
           },
         },
       }
@@ -292,6 +293,11 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         console.warn("failed. restarting ice");
         pc.restartIce();
         // maybe send to socket?
+        return;
+      }
+      if (pc.iceConnectionState === "disconnected") {
+        this.destroyPeerConnection(userId);
+        return;
       }
     };
     pc.onicecandidate = ({ candidate }) => {
@@ -330,6 +336,21 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     const pc = this.pcs[userId];
     const user = this.state.users[userId];
     console.log(`Destroying peer connection for ${userId}`);
+    if (!user) {
+      console.error(`No user found for id ${userId}`);
+      return;
+    }
+    if (user.mediaStream) {
+      for (const track of user.mediaStream.getTracks()) {
+        track.stop();
+      }
+    }
+    this.setState(prevState => {
+      const u = prevState.users[userId];
+      return {
+        users: { ...prevState.users, [userId]: {...u, mediaStream: undefined } },
+      };
+    });
     if (!pc) {
       console.error(`Peer connection for ${userId} doesn't exist.`);
       return;
@@ -343,17 +364,8 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     pc.onicegatheringstatechange = null;
     pc.onnegotiationneeded = null;
 
-    if (user.mediaStream) {
-      for (const track of user.mediaStream.getTracks()) {
-        track.stop();
-      }
-    }
-
     pc.close();
     delete this.pcs[userId];
-    this.setState({
-      users: { ...this.state.users, [userId]: {...user, mediaStream: undefined } },
-    });
   }
 
   async startVideo (user?: User) {
@@ -364,6 +376,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
     if (!user) {
       for (const [id, user] of Object.entries(this.state.users)) {
+        if (id === this.state.id) {
+          // Don't try to start video chat with self
+          continue;
+        }
         await this.startVideo(user);
       }
       return;
@@ -375,17 +391,23 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
 
     // TODO: fix this logic to work with multiple users
-    if (this.state.videoState === "on") {
+    if (this.state.users[user.user_id].mediaStream) {
       console.error("already video chatting");
       return;
     }
     const cameraStream = await this.startCamera({ audio: true });
-    this.videoSelfRef.current.srcObject = cameraStream;
-    this.videoSelfRef.current.play();
-    this.setState({
-      cameraStream,
-      videoState: "on",
-    });
+    if (this.state.videoState !== "on") {
+      this.videoSelfRef.current.srcObject = cameraStream;
+      this.videoSelfRef.current.play();
+      this.setState(prevState => {
+        const me = prevState.users[prevState.id];
+        return {
+          cameraStream,
+          videoState: "on",
+          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
+        };
+      });
+    }
 
     const pc = new RTCPeerConnection(config);
     for (const track of cameraStream.getTracks()) {
@@ -408,6 +430,13 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
   async toggleVideo (user: UserWithData) {
     if (user.mediaStream) {
+      this.socket.send({
+        cmd: "stop_video",
+        data: {
+          from: this.state.id, // server ignores this
+          to: user.user_id,
+        },
+      });
       await this.stopVideo(user);
     } else {
       await this.startVideo(user);
@@ -431,12 +460,18 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
 
     const cameraStream = await this.startCamera({ audio: true });
-    this.videoSelfRef.current.srcObject = cameraStream;
-    this.videoSelfRef.current.play();
-    this.setState({
-      cameraStream,
-      videoState: "on",
-    });
+    if (this.state.videoState !== "on") {
+      this.videoSelfRef.current.srcObject = cameraStream;
+      this.videoSelfRef.current.play();
+      this.setState(prevState => {
+        const me = prevState.users[prevState.id];
+        return {
+          cameraStream,
+          videoState: "on",
+          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
+        };
+      });
+    }
 
     const pc = new RTCPeerConnection(config);
     for (const track of cameraStream.getTracks()) {
@@ -498,6 +533,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   stopVideo (user?: UserWithData) {
     if (!user) {
       for (const [id, user] of Object.entries(this.state.users)) {
+        if (id === this.state.id) {
+          // Don't try to start video chat with self
+          continue;
+        }
         this.stopVideo(user);
       }
       return;
@@ -506,8 +545,11 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.destroyPeerConnection(user.user_id);
 
     if (Object.values(this.pcs).length === 0) {
+      console.log("No more video chats. Turning back to snapshot mode.");
+      const me = this.state.users[this.state.id];
       this.setState({
         videoState: "snapshot",
+        users: { ...this.state.users, [this.state.id]: {...me, mediaStream: undefined } },
       });
     }
   }
@@ -527,25 +569,25 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
   render () {
     const { cameraStream, videoState, messages, users, id } = this.state;
+    const me = users[id];
 
     return <div className="videos">
       { cameraStream
-        ? <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Turn off camera</button>
+        ? <>
+          <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Turn off camera</button>
+          <button type="button" onClick={() => this.snapshot()} disabled={!cameraStream}>Retake snapshot</button>
+        </>
         : <button type="button" onClick={() => this.startSnapshots()} disabled={!!cameraStream}>Turn on camera</button>
       }
       { videoState === "on"
         ? <button type="button" onClick={() => this.stopVideo()}>Stop all video chat</button>
-        : <button type="button" onClick={() => this.startVideo()}>Start all video chat</button>
+        : <button type="button" onClick={() => this.startVideo()}>Start video chat with everyone</button>
       }
       <canvas id="canvas_self" ref={this.canvasSelfRef} />
-      <video id="video_self" ref={this.videoSelfRef} style={{ display: videoState === "on" ? undefined : "none" }} width="300" muted />
+      <video id="video_self" ref={this.videoSelfRef} style={{ display: "none" }} width="300" muted />
       <br />
-{/*      <ul id="user_list">
-        { Object.values(users).map((u, i) => <li key={i}>{ u.name }</li>) }
-      </ul>
-*/}
-      {/*<UserTile key={u.user_id} user={u} isSelf={u.user_id === id } onClick={() => this.toggleVideo(u)} />*/}
-      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={u.user_id === id } onClick={() => this.toggleVideo(u)} />) }
+      {/*<UserTile user={me} isSelf={true} onClick={() => this.toggleVideo(me)} />*/}
+      { Object.values(users).map((u, i) => <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} />) }
 
       <Messages messages={messages} />
       <form id="chat-box" onSubmit={e => this.sendMessage(e)}>
@@ -580,6 +622,7 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
       className="user_video"
       id={`video_${user.user_id}`}
       srcObject={user.mediaStream}
+      muted={isSelf}
       style={{ display: showVideo ? undefined : "none" }}
     />
     <img

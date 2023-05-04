@@ -7,6 +7,7 @@ const defaultSettings = {
   microphone: "",
   speaker: "",
   autoSnapshot: false,
+  timeLapse: false,
 };
 
 try {
@@ -15,8 +16,10 @@ try {
   defaultSettings.microphone = settings.microphone;
   defaultSettings.speaker = settings.speaker;
   defaultSettings.autoSnapshot = settings.autoSnapshot;
+  defaultSettings.timeLapse = settings.timeLapse;
 } catch (e) {
-  console.error(e);
+  console.error("Error reading settings:", e);
+  console.log("Using default settings.");
 }
 
 export type Action = { type: string, value: string };
@@ -50,6 +53,12 @@ function settingsReducer (settings=defaultSettings, action: Action) {
       settings = {
         ...settings,
         autoSnapshot: action.value === "true" ? true : false,
+      }
+    break;
+    case "setTimeLapse":
+      settings = {
+        ...settings,
+        timeLapse: action.value === "true" ? true : false,
       }
     break;
   }
@@ -114,6 +123,7 @@ export const Settings = () => {
   useEffect(() => {
     async function enumerateDevices () {
       const deviceList = await navigator.mediaDevices?.enumerateDevices();
+      console.log("Devices", deviceList);
       if (deviceList) {
         setDevices(deviceList);
       }
@@ -121,15 +131,15 @@ export const Settings = () => {
     if (!devices.length) {
       enumerateDevices();
     }
-  }, [devices.length]);
+  }, [permissions]);
 
   useEffect(() => {
     async function getAndSetPermissions () {
-      const permissions = await getPermissions();
+      const perms = await getPermissions();
       setPermissions({
-        camera: permissions.camera,
-        microphone: permissions.microphone,
-        autoplay: permissions.autoplay,
+        camera: perms.camera,
+        microphone: perms.microphone,
+        autoplay: perms.autoplay,
       });
     }
     getAndSetPermissions();
