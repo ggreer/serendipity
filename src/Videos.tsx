@@ -320,7 +320,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       track.onunmute = () => {
         console.log("unmuted track", track);
         // only play the sound once
-        if (track.kind === "audio") {
+        if (track.kind === "audio" && this.context.playSounds) {
           playStartVideo();
         }
         this.setState(prevState => {
@@ -342,7 +342,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
     if (user.mediaStream) {
-      playStopVideo();
+      if (this.context.playSounds) {
+        playStopVideo();
+      }
       for (const track of user.mediaStream.getTracks()) {
         track.stop();
       }
@@ -379,6 +381,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           users: { ...prevState.users, [prevState.id]: {...me, mediaStream: undefined } },
         };
       });
+      this.snapshot();
     }
   }
 
