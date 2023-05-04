@@ -91,4 +91,5 @@ export class Socket {
   }
 }
 
-export const socket = new Socket(`ws://${document.location.hostname}:4000/ws`);
+export const socket = new Socket(`wss://${document.location.hostname}/ws${document.location.pathname}`);
+// export const socket = new Socket(`ws://${document.location.hostname}:4000/ws${document.location.pathname}`);

@@ -318,16 +318,12 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.log("new track", track, "streams:", streams);
       track.onunmute = () => {
         console.log("unmuted track", track);
-        const u = this.state.users[userId];
-        this.setState({
-          users: { ...this.state.users, [userId]: {...u, mediaStream: streams[0] } },
+        this.setState(prevState => {
+          const u = prevState.users[userId];
+          return {
+            users: { ...prevState.users, [userId]: {...u, mediaStream: streams[0] } },
+          };
         });
-        const videoElem = document.getElementById(`video_${userId}`);
-        if (videoElem) {
-          (videoElem as HTMLVideoElement).srcObject = streams[0];
-        } else {
-          console.warn("no video elem", `video_${userId}`);
-        }
       };
     };
   }
@@ -351,6 +347,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         users: { ...prevState.users, [userId]: {...u, mediaStream: undefined } },
       };
     });
+
     if (!pc) {
       console.error(`Peer connection for ${userId} doesn't exist.`);
       return;
@@ -366,6 +363,17 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
     pc.close();
     delete this.pcs[userId];
+
+    if (Object.values(this.pcs).length === 0) {
+      console.log("No more video chats. Turning back to snapshot mode.");
+      this.setState(prevState => {
+        const me = prevState.users[prevState.id];
+        return {
+          videoState: "snapshot",
+          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: undefined } },
+        };
+      });
+    }
   }
 
   async startVideo (user?: User) {
@@ -390,9 +398,8 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    // TODO: fix this logic to work with multiple users
     if (this.state.users[user.user_id].mediaStream) {
-      console.error("already video chatting");
+      console.error("already video chatting with", user);
       return;
     }
     const cameraStream = await this.startCamera({ audio: true });
@@ -543,15 +550,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
 
     this.destroyPeerConnection(user.user_id);
-
-    if (Object.values(this.pcs).length === 0) {
-      console.log("No more video chats. Turning back to snapshot mode.");
-      const me = this.state.users[this.state.id];
-      this.setState({
-        videoState: "snapshot",
-        users: { ...this.state.users, [this.state.id]: {...me, mediaStream: undefined } },
-      });
-    }
   }
 
   sendMessage (e: React.FormEvent<HTMLFormElement>) {
@@ -620,7 +618,6 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
   return <div className={classNames("user_tile", { self: isSelf })} onClick={onClick}>
     <Video
       className="user_video"
-      id={`video_${user.user_id}`}
       srcObject={user.mediaStream}
       muted={isSelf}
       style={{ display: showVideo ? undefined : "none" }}
