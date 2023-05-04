@@ -43,6 +43,7 @@ export interface ServerSnapshotInfo {
 export interface UserJoinInfo extends User { }
 export interface UserLeaveInfo extends User { }
 export interface RoomInfo {
+  name: string;
   you: UserId
   users: Record<UserId, User & ServerSnapshotInfo>;
 }

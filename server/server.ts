@@ -45,8 +45,10 @@ const wss = new WebSocketServer({
 });
 
 const server = createServer((req, res) => {
+  const { method } = req;
   const { pathname } = parse(req.url ?? "");
-  if (pathname === "/healthz") {
+  console.log(`Request from ${req.connection.remoteFamily} ${req.connection.remoteAddress}:${req.connection.remotePort} method ${method} path ${pathname}`);
+  if (method === "GET" && pathname === "/healthz") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ status: "OK" }));
     return;
@@ -58,12 +60,15 @@ server.on("listening", () => {
   console.log("listening", server.address());
 });
 server.on("upgrade", (req, socket, head) => {
+  const { method } = req;
   const { pathname } = parse(req.url ?? "");
-  if (pathname === "/ws") {
+  console.log(`Upgrade from ${req.connection.remoteFamily} ${req.connection.remoteAddress}:${req.connection.remotePort} method ${method} path ${pathname}`);
+  if (pathname && pathname.startsWith("/ws/")) {
     wss.handleUpgrade(req, socket, head, function done(ws) {
       wss.emit("connection", ws, req);
     });
   } else {
+    console.log(`Upgrade failed. Destroying connection from ${req.connection.remoteFamily} ${req.connection.remoteAddress}:${req.connection.remotePort} method ${method} path ${pathname}`);
     socket.destroy();
   }
 });
@@ -72,8 +77,10 @@ server.listen(parseInt(process.env.PORT || "") || 4000);
 
 class Room {
   conns: Record<string, Connection> = {};
+  name: string;
 
-  constructor () {
+  constructor (name: string) {
+    this.name = name;
     this.conns = {};
   }
 
@@ -94,10 +101,34 @@ class Room {
   remove (conn: Connection) {
     delete this.conns[conn.id];
     this.send({ cmd: "leave", data: { user_id: conn.id, name: conn.name } });
+    if (Object.values(this.conns).length === 0) {
+      destroyRoom(this);
+    }
   }
 }
 
-const room = new Room();
+
+const rooms: Record<string, Room> = {};
+
+// TODO: auth
+function getOrCreateRoom (ws: WebSocket, req: IncomingMessage): Room {
+  const { pathname } = parse(req.url ?? "");
+  if (!pathname) {
+    throw new Error("No room name specified.");
+  }
+  let room = rooms[pathname];
+  if (!room) {
+    console.log(`New room '${pathname}'`);
+    room = new Room(pathname);
+    rooms[pathname] = room;
+  }
+  return room;
+}
+
+function destroyRoom (room: Room) {
+  console.log(`Room ${room.name} empty. Destroying.`);
+  delete rooms[room.name];
+}
 
 
 class Connection {
@@ -108,6 +139,7 @@ class Connection {
   heartbeatInterval: NodeJS.Timer;
   name: string;
   snapshot: string;
+  room: Room;
 
   constructor (ws: WebSocket, req: IncomingMessage) {
     this.ws = ws;
@@ -155,10 +187,22 @@ class Connection {
     this.name = this.id;
     this.snapshot = "";
 
-    // TODO: route room and auth based on req path
-    room.add(this);
+    let r: Room|undefined;
+    try {
+      r = getOrCreateRoom(ws, req);
+    } catch (e) {
+      this.send({
+        cmd: "error",
+        data: (e as Error).toString(),
+      });
+      this.room = new Room(""); // create a dummy room object so typescript isn't angry
+      this.destroy();
+      return;
+    }
+    this.room = r;
+    this.room.add(this);
     const roomInfo: Record<string, User & ServerSnapshotInfo> = {};
-    for (const [conn_id, conn] of Object.entries(room.conns)) {
+    for (const [conn_id, conn] of Object.entries(this.room.conns)) {
       roomInfo[conn_id] = {
         name: conn.name,
         user_id: conn.id,
@@ -168,6 +212,7 @@ class Connection {
     this.send({
       cmd: "room_info",
       data: {
+        name: this.room.name,
         users: roomInfo,
         you: this.id,
       },
@@ -199,7 +244,7 @@ class Connection {
         console.error(`Error from ${this.toString()}`);
         break;
       case "msg":
-        room.send({
+        this.room.send({
           cmd: "msg",
           data: {
             user: { user_id: this.id, name: this.name },
@@ -209,7 +254,7 @@ class Connection {
         break;
       case "snapshot":
         const snapshot = (msg.data as ClientSnapshotInfo);
-        room.send({
+        this.room.send({
           cmd: "snapshot",
           data: {
             user_id: this.id,
@@ -220,7 +265,7 @@ class Connection {
         break;
       case "offer_video":
         const ovi = (msg.data as OfferVideoInfo);
-        room.send({
+        this.room.send({
           cmd: "offer_video",
           data: {
             from: this.id,
@@ -231,7 +276,7 @@ class Connection {
         break;
       case "accept_video":
         const avi = (msg.data as AcceptVideoInfo);
-        room.send({
+        this.room.send({
           cmd: "accept_video",
           data: {
             from: this.id,
@@ -242,7 +287,7 @@ class Connection {
         break;
       case "ice_candidate":
         const ici = (msg.data as IceCandidateInfo);
-        room.send({
+        this.room.send({
           cmd: "ice_candidate",
           data: {
             from: this.id,
@@ -253,7 +298,7 @@ class Connection {
         break;
       case "stop_video":
         const stopVideoInfo = (msg.data as StopVideoInfo);
-        room.send({
+        this.room.send({
           cmd: "stop_video",
           data: {
             from: this.id,
@@ -269,7 +314,7 @@ class Connection {
   }
 
   destroy () {
-    room.remove(this);
+    this.room.remove(this);
     this.ws.terminate();
     clearInterval(this.heartbeatInterval);
   }
