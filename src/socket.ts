@@ -29,19 +29,22 @@ export class Socket {
     };
   }
 
-  async reconnect (e: Event|CloseEvent) {
+  reconnect (e: Event|CloseEvent) {
     this.destroy();
     this.wsErrors++;
     this.wsReqId = 0;
     const wait = Math.min(Math.pow(1.5, this.wsErrors) * 1000, 10000);
     console.error("Websocket error", e);
     console.error(`Reconnecting in ${wait}ms`);
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), wait));
-    if (this.ws?.readyState === WebSocket.CONNECTING) {
-      return;
-    }
 
-    this.connect();
+    setTimeout(() => {
+      if (this.ws?.readyState === WebSocket.CONNECTING) {
+        console.log("websocket connecting. not trying to connect");
+        return;
+      }
+
+      this.connect();
+    }, wait);
   }
 
   destroy () {
@@ -53,12 +56,11 @@ export class Socket {
     ws.onerror = null;
     ws.onclose = null;
     ws.onmessage = null;
-    ws.close();
     if (ws.readyState in [WebSocket.CONNECTING, WebSocket.CLOSING, WebSocket.CLOSED]) {
       console.log("socket destroy: doing nothing because websocket is in state", ws.readyState);
       return;
     }
-    // WebSocket.OPEN
+    ws.close();
   }
 
   send (msg: Omit<ClientMessage, "req_id">) {
