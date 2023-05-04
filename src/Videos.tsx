@@ -592,7 +592,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         : <button type="button" onClick={() => this.startVideo()}>Start video chat with everyone</button>
       }
       <canvas id="canvas_self" ref={this.canvasSelfRef} />
-      <video id="video_self" ref={this.videoSelfRef} style={{ display: "none" }} width="300" muted />
+      <video id="video_self" ref={this.videoSelfRef} playsInline style={{ display: "none" }} width="300" muted />
       <br />
       { userContent }
       <Messages messages={messages} />
@@ -627,6 +627,7 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
     <Video
       className="user_video"
       srcObject={user.mediaStream}
+      playsInline
       muted={isSelf}
       style={{ display: showVideo ? undefined : "none" }}
     />
