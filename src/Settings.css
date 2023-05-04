@@ -15,3 +15,6 @@ div.break {
 button.settings {
   float: right;
 }
+dialog {
+  z-index: 10;
+}
