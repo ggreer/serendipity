@@ -668,12 +668,14 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
       playsInline
       muted={isSelf}
       style={{ display: showVideo ? undefined : "none" }}
+      title="Click to stop video chat."
     />
     <img
-      className="user_image"
+      className={classNames("user_image", {"placeholder": !user.snapshot})}
       alt={user.name}
-      src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.png`}
+      src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.svg`}
       style={{ display: showVideo ? "none" : undefined }}
+      title="Click to start video chat."
     />
     { user.name } { isSelf ? "(You)" : "" }
   </div>;

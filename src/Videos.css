@@ -23,7 +23,12 @@
 }
 
 .user_image, .user_video {
-  width: 240px;
+  max-width: 240px;
+  max-height: 180px;
+  margin: 0 auto;
+  display: block;
+}
+img.placeholder {
   height: 180px;
 }
 .self > .user_image, .self > .user_video {
