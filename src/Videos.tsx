@@ -43,7 +43,7 @@ type VideosState = {
 // TODO: check support for media APIs
 const video_width = 640;
 const video_height = 480;
-const snapshot_interval = 60 * 1000;
+const snapshot_interval = 30 * 1000;
 
 const config = {
   iceServers: [
