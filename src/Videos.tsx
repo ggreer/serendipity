@@ -244,7 +244,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       }
       context.putImageData(imageData, 0, 0);
     }
-    const dataUrl = this.canvasSelfRef.current.toDataURL("image/webp", 0.7);
+    const dataUrl = this.canvasSelfRef.current.toDataURL("image/webp", 0.8);
     this.setState(prevState => {
       return {
         users: {
