@@ -1,6 +1,9 @@
 #canvas_self {
   display: none;
 }
+#video_self {
+  display: none;
+}
 
 #chat {
   height: 300px;

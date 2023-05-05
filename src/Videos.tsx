@@ -18,8 +18,10 @@ import type {
   StopVideoInfo,
   User,
   UserId,
+  UserInfo,
   UserJoinInfo,
   UserLeaveInfo,
+  VideoChatGroups,
 } from './protocol';
 
 import { Socket, socket } from './socket';
@@ -208,13 +210,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    let { cameraStream, videoState } = this.state;
-    if (!cameraStream) {
-      cameraStream = await this.startCamera();
-
-      this.videoSelfRef.current.srcObject = cameraStream;
-      this.videoSelfRef.current?.play();
-
+    const { cameraStream: oldCameraStream, videoState } = this.state;
+    const cameraStream = await this.startCamera();
+    if (cameraStream !== oldCameraStream) {
       // Most cameras take a second or two to "warm up" (get correct exposure)
       console.log("warming up...");
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
@@ -263,11 +261,21 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     });
   }
 
-  async startCamera (constraints?: MediaStreamConstraints): Promise<MediaStream> {
-    if (this.state.cameraStream) {
-      return this.state.cameraStream;
+  async startCamera (): Promise<MediaStream> {
+    let { cameraStream } = this.state;
+    let isCameraWorking = true;
+    if (cameraStream) {
+      for (const track of cameraStream.getTracks()) {
+        console.log(track);
+        if (track.readyState === "ended") {
+          isCameraWorking = false;
+        }
+      }
     }
-    const cameraStream = await navigator.mediaDevices.getUserMedia({
+    if (cameraStream && isCameraWorking) {
+      return cameraStream;
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user", // Prefer selfie cam if on mobile
           deviceId: this.context.camera,
@@ -277,6 +285,12 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.setState({
       cameraStream,
     })
+    if (this.videoSelfRef.current) {
+      this.videoSelfRef.current.srcObject = cameraStream;
+      this.videoSelfRef.current.play();
+    } else {
+      console.error("No video ref");
+    }
     return cameraStream;
   }
 
@@ -414,11 +428,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   async startVideo (user?: User) {
-    if (!this.videoSelfRef.current) {
-      console.error("No video ref");
-      return;
-    }
-
     if (!user) {
       for (const [id, user] of Object.entries(this.state.users)) {
         if (id === this.state.id) {
@@ -439,7 +448,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.error("already video chatting with", user);
       return;
     }
-    const cameraStream = await this.startCamera({ audio: true });
+    const cameraStream = await this.startCamera();
     this.playSelfVideo();
 
     const pc = new RTCPeerConnection(config);
@@ -462,10 +471,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   playSelfVideo () {
-    if (!this.videoSelfRef.current) {
-      console.error("No video ref");
-      return;
-    }
     const { cameraStream, videoState } = this.state;
     if (!cameraStream) {
       console.error("No camera stream");
@@ -474,8 +479,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     if (videoState === "on") {
       return;
     }
-    this.videoSelfRef.current.srcObject = cameraStream;
-    this.videoSelfRef.current.play();
     this.setState(prevState => {
       const me = prevState.users[prevState.id];
       return {
@@ -512,12 +515,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    if (!this.videoSelfRef.current) {
-      console.error("No video ref");
-      return;
-    }
-
-    const cameraStream = await this.startCamera({ audio: true });
+    const cameraStream = await this.startCamera();
     this.playSelfVideo();
 
     const pc = new RTCPeerConnection(config);
@@ -630,7 +628,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         : <button type="button" onClick={() => this.startVideo()}>Start video chat with everyone</button>
       }
       <canvas id="canvas_self" ref={this.canvasSelfRef} />
-      <video id="video_self" ref={this.videoSelfRef} playsInline style={{ display: "none" }} width="300" muted />
+      <video id="video_self" ref={this.videoSelfRef} playsInline width="300" muted />
       <br />
       { userContent }
       <Messages messages={messages} />
