@@ -104,6 +104,20 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.stopSnapshots();
   }
 
+  componentDidUpdate (prevProps: VideosProps, prevState: VideosState) {
+    if (prevState.videoState === this.state.videoState) {
+      return;
+    }
+    if (this.state.videoState === "on") {
+      setTimeout(() => this.snapshot(), 500); // delay snapshot because video element might be solid white for a bit
+      clearInterval(this.snapshotInterval);
+      this.snapshotInterval = setInterval(() => this.snapshot(), 1000); // send snapshots more often when video chatting
+    } else if (this.state.videoState === "snapshot") {
+      clearInterval(this.snapshotInterval);
+      this.snapshotInterval = setInterval(() => this.snapshot(), snapshot_interval);
+    }
+  }
+
   handleMsg (msg: ServerMessage) {
     const messages = this.state.messages;
     messages.push(msg);
@@ -169,6 +183,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   async startSnapshots () {
+    this.setState(prevState => {
+      if (prevState.videoState === "off") {
+        return {
+          videoState: "snapshot",
+        }
+      }
+      return {
+        videoState: prevState.videoState,
+      }
+    });
     this.snapshot();
     this.snapshotInterval = setInterval(() => this.snapshot(), snapshot_interval);
   }
@@ -184,7 +208,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    let { cameraStream } = this.state;
+    let { cameraStream, videoState } = this.state;
     if (!cameraStream) {
       cameraStream = await this.startCamera();
 
@@ -202,20 +226,25 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     canvas.width = video_width/2;
     canvas.height = video_height/2;
     context.drawImage(this.videoSelfRef.current, 0, 0, canvas.width, canvas.height);
-    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      // weighted average of RGB values to mimic human color perception. We see greens much better than we see blues or reds.
-      const luminosity =
-        0.21 * data[i] +
-        0.72 * data[i + 1] +
-        0.07 * data[i + 2];
-      data[i] = luminosity;
-      data[i + 1] = luminosity;
-      data[i + 2] = luminosity;
+    // Send color if video chatting, grayscale if not
+    if (videoState === "on") {
+      console.log("color");
+    } else {
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // weighted average of RGB values to mimic human color perception. We see greens much better than we see blues or reds.
+        const luminosity =
+          0.21 * data[i] +
+          0.72 * data[i + 1] +
+          0.07 * data[i + 2];
+        data[i] = luminosity;
+        data[i + 1] = luminosity;
+        data[i + 2] = luminosity;
+      }
+      context.putImageData(imageData, 0, 0);
     }
-    context.putImageData(imageData, 0, 0);
-    const dataUrl = this.canvasSelfRef.current.toDataURL("image/jpeg");
+    const dataUrl = this.canvasSelfRef.current.toDataURL("image/webp", 0.7);
     this.setState(prevState => {
       return {
         users: {
@@ -380,8 +409,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           videoState: "snapshot",
           users: { ...prevState.users, [prevState.id]: {...me, mediaStream: undefined } },
         };
-      });
-      this.snapshot();
+      }, () => this.snapshot());
     }
   }
 
@@ -443,18 +471,19 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.error("No camera stream");
       return;
     }
-    if (videoState !== "on") {
-      this.videoSelfRef.current.srcObject = cameraStream;
-      this.videoSelfRef.current.play();
-      this.setState(prevState => {
-        const me = prevState.users[prevState.id];
-        return {
-          cameraStream,
-          videoState: "on",
-          users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
-        };
-      });
+    if (videoState === "on") {
+      return;
     }
+    this.videoSelfRef.current.srcObject = cameraStream;
+    this.videoSelfRef.current.play();
+    this.setState(prevState => {
+      const me = prevState.users[prevState.id];
+      return {
+        cameraStream,
+        videoState: "on",
+        users: { ...prevState.users, [prevState.id]: {...me, mediaStream: cameraStream } },
+      };
+    });
   }
 
   async toggleVideo (user: UserWithData) {
