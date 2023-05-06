@@ -16,6 +16,8 @@ import type {
   StopVideoInfo,
   User,
   UserId,
+  UserInfo,
+  VideoChatGroups,
 } from "../src/protocol";
 
 
@@ -74,14 +76,17 @@ server.on("upgrade", (req, socket, head) => {
 });
 server.listen(parseInt(process.env.PORT || "") || 4000);
 
-
 class Room {
   conns: Record<string, Connection> = {};
   name: string;
+  groups: VideoChatGroups;
+  groupCount: number;
 
   constructor (name: string) {
     this.name = name;
     this.conns = {};
+    this.groups = {};
+    this.groupCount = 0;
   }
 
   send (msg: Omit<ServerMessage, "res_id">, from?: UserId) {
@@ -104,6 +109,108 @@ class Room {
     if (Object.values(this.conns).length === 0) {
       destroyRoom(this);
     }
+  }
+
+  offerVideo (ovi: OfferVideoInfo, from: Connection) {
+    const to = this.conns[ovi.to];
+    if (!to) {
+      from.send({
+        cmd: "error",
+        data: "User does not exist.",
+      });
+      return;
+    }
+    if (from.group && to.group) {
+      // if both are in groups, join groups. that means a new command so that clients are on the same page and all start chats with each other
+      console.error("OMG they're both in different groups");
+    } else if (from.group) {
+      // if from is in a group but to isn't, to join's from's group
+      this.groups[from.group].push(to.id);
+      to.group = from.group;
+    } else if (to.group) {
+      // if from is not in a group but to is, from join's to's group
+      // (in other words if only one is video chatting, join the new person to the existing group)
+      this.groups[to.group].push(from.id);
+      from.group = to.group;
+    } else {
+      // if nobody is video chatting, create a group and join both to it
+      const groupId = (this.groupCount++).toString();
+      this.groups[groupId] = [to.id, from.id];
+      to.group = groupId;
+      from.group = groupId;
+    }
+    this.send({
+      cmd: "offer_video",
+      data: {
+        from: from.id,
+        to: ovi.to,
+        pc_description: ovi.pc_description,
+      },
+    }, from.id);
+    console.dir(this.groups);
+  }
+
+  acceptVideo (avi: AcceptVideoInfo, from: Connection) {
+    const to = this.conns[avi.to];
+    if (!to) {
+      from.send({
+        cmd: "error",
+        data: "User does not exist.",
+      });
+      return;
+    }
+
+    this.send({
+      cmd: "accept_video",
+      data: {
+        from: from.id,
+        to: avi.to,
+        pc_description: avi.pc_description,
+      },
+    }, from.id);
+  }
+
+  stopVideo (svi: StopVideoInfo, from: Connection) {
+    const to = this.conns[svi.to];
+    if (!to) {
+      from.send({
+        cmd: "error",
+        data: "User does not exist.",
+      });
+      return;
+    }
+
+    this.send({
+      cmd: "stop_video",
+      data: {
+        from: from.id,
+        to: svi.to,
+      },
+    }, from.id);
+
+    if (from.group === null || to.group === null) {
+      // TODO: unclear if this is correct
+      from.send({
+        cmd: "error",
+        data: "Can't stop video for users who aren't video chatting.",
+      });
+      return;
+    }
+
+    if (from.group !== to.group) {
+      from.send({
+        cmd: "error",
+        data: "Can't stop video for two users who aren't in the same video chat.",
+      });
+      return;
+    }
+
+    this.groups[from.group] = this.groups[from.group].filter(userId => userId !== from.id && userId !== to.id);
+    if (this.groups[from.group].length === 0) {
+      delete this.groups[from.group];
+    }
+    to.group = null;
+    from.group = null;
   }
 }
 
@@ -140,12 +247,14 @@ class Connection {
   name: string;
   snapshot: string;
   room: Room;
+  group: string|null;
 
   constructor (ws: WebSocket, req: IncomingMessage) {
     this.ws = ws;
     this.req = req;
     this.id = `userid_${ids++}`;
     this.isAlive = true;
+    this.group = null;
     console.log(`Connection from ${this.toString()}`);
 
     ws.on("close", (code, reason) => {
@@ -201,12 +310,13 @@ class Connection {
     }
     this.room = r;
     this.room.add(this);
-    const roomInfo: Record<string, User & ServerSnapshotInfo> = {};
+    const roomInfo: Record<string, User & UserInfo> = {};
     for (const [conn_id, conn] of Object.entries(this.room.conns)) {
       roomInfo[conn_id] = {
         name: conn.name,
         user_id: conn.id,
         snapshot: conn.snapshot,
+        group: conn.group,
       }
     }
     this.send({
@@ -215,6 +325,7 @@ class Connection {
         name: this.room.name,
         users: roomInfo,
         you: this.id,
+        groups: this.room.groups,
       },
     });
   }
@@ -225,7 +336,9 @@ class Connection {
   }
 
   send (msg: ServerMessage) {
-    console.debug(this.toString(), "send", JSON.stringify(msg, null, 2));
+    if (msg.cmd !== "snapshot") {
+      console.debug(this.toString(), "send", JSON.stringify(msg, null, 2));
+    }
     this.ws.send(JSON.stringify(msg));
   }
 
@@ -234,7 +347,9 @@ class Connection {
   }
 
   handleMessage (msg: ClientMessage) {
-    console.debug(this.toString(), "recv", JSON.stringify(msg, null, 2));
+    if (msg.cmd !== "snapshot") {
+      console.debug(this.toString(), "recv", JSON.stringify(msg, null, 2));
+    }
     if (!msg.req_id) {
       this.send({ cmd: "error", data: "Unknown command. No req_id." });
       return;
@@ -265,25 +380,11 @@ class Connection {
         break;
       case "offer_video":
         const ovi = (msg.data as OfferVideoInfo);
-        this.room.send({
-          cmd: "offer_video",
-          data: {
-            from: this.id,
-            to: ovi.to,
-            pc_description: ovi.pc_description,
-          },
-        }, this.id);
+        this.room.offerVideo(ovi, this);
         break;
       case "accept_video":
         const avi = (msg.data as AcceptVideoInfo);
-        this.room.send({
-          cmd: "accept_video",
-          data: {
-            from: this.id,
-            to: avi.to,
-            pc_description: avi.pc_description,
-          },
-        }, this.id);
+        this.room.acceptVideo(avi, this);
         break;
       case "ice_candidate":
         const ici = (msg.data as IceCandidateInfo);
@@ -297,14 +398,8 @@ class Connection {
         }, this.id);
         break;
       case "stop_video":
-        const stopVideoInfo = (msg.data as StopVideoInfo);
-        this.room.send({
-          cmd: "stop_video",
-          data: {
-            from: this.id,
-            to: stopVideoInfo.to,
-          },
-        }, this.id);
+        const svi = (msg.data as StopVideoInfo);
+        this.room.stopVideo(svi, this);
         break;
       default:
         this.respond(msg.req_id, { cmd: "error", data: "Unknown command" });

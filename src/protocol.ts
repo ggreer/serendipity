@@ -3,6 +3,10 @@ export interface User {
   user_id: UserId;
   name: string;
 }
+export interface UserInfo {
+  snapshot: string;
+  group: string|null;
+}
 
 const commonCommands = [
   "error",
@@ -40,12 +44,15 @@ export interface ServerSnapshotInfo {
   snapshot: string;
 }
 
+export type VideoChatGroups = Record<string, Array<UserId>>;
+
 export interface UserJoinInfo extends User { }
 export interface UserLeaveInfo extends User { }
 export interface RoomInfo {
   name: string;
   you: UserId
-  users: Record<UserId, User & ServerSnapshotInfo>;
+  users: Record<UserId, User & UserInfo>;
+  groups: VideoChatGroups;
 }
 export interface ServerMsgInfo {
   user: User;
