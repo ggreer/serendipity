@@ -129,18 +129,22 @@ export const Settings = () => {
     autoplay: "prompt",
   });
 
-  useEffect(() => {
-    async function enumerateDevices () {
-      const deviceList = await navigator.mediaDevices?.enumerateDevices();
-      console.log("Devices", deviceList);
-      if (deviceList) {
-        setDevices(deviceList);
-      }
+  async function enumerateDevices () {
+    const deviceList = await navigator.mediaDevices?.enumerateDevices();
+    console.log("Devices", deviceList);
+    if (deviceList) {
+      setDevices(deviceList);
     }
+  }
+  useEffect(() => {
     if (!devices.length) {
       enumerateDevices();
     }
   }, [permissions]);
+  // Update device list if devices change
+  navigator.mediaDevices.ondevicechange = (event) => {
+    enumerateDevices();
+  };
 
   useEffect(() => {
     async function getAndSetPermissions () {
@@ -182,11 +186,11 @@ export const Settings = () => {
       <form method="dialog">
         <fieldset>
           <legend>Options</legend>
-          <input type="checkbox" name="auto-snapshot" id="settings-auto-snapshot" defaultChecked={settings.autoSnapshot} onChange={e => dispatch({ type: "setAutoSnapshot", value: e.target.checked ? "true" : "false"})} />
+          <input type="checkbox" name="auto-snapshot" id="settings-auto-snapshot" checked={settings.autoSnapshot} onChange={e => dispatch({ type: "setAutoSnapshot", value: e.target.checked ? "true" : "false"})} />
           <label htmlFor="settings-auto-snapshot">Automatically enable camera</label>
           <div className="break" />
 
-          <input type="checkbox" name="play-sounds" id="settings-play-sounds" defaultChecked={settings.playSounds} onChange={e => dispatch({ type: "setPlaySounds", value: e.target.checked ? "true" : "false"})} />
+          <input type="checkbox" name="play-sounds" id="settings-play-sounds" checked={settings.playSounds} onChange={e => dispatch({ type: "setPlaySounds", value: e.target.checked ? "true" : "false"})} />
           <label htmlFor="settings-play-sounds">Play sounds when starting/stopping video chat</label>
         </fieldset>
 
