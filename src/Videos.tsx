@@ -196,6 +196,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       }
     });
     this.snapshot();
+    clearInterval(this.snapshotInterval);
     this.snapshotInterval = setInterval(() => this.snapshot(), snapshot_interval);
   }
 
