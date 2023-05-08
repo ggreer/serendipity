@@ -1,11 +1,12 @@
 export type UserId = string;
+export type GroupId = string;
 export interface User {
   user_id: UserId;
   name: string;
 }
 export interface UserInfo {
   snapshot: string;
-  group: string|null;
+  group: GroupId|null;
 }
 
 const commonCommands = [
@@ -28,6 +29,7 @@ const serverCommands = [
   "leave",
   "msg",
   "room_info",
+  "group",
 ] as const;
 
 export type ClientCommand = typeof commonCommands[number] | typeof clientCommands[number];
@@ -44,7 +46,7 @@ export interface ServerSnapshotInfo {
   snapshot: string;
 }
 
-export type VideoChatGroups = Record<string, Array<UserId>>;
+export type VideoChatGroups = Record<GroupId, Array<UserId>>;
 
 export interface UserJoinInfo extends User { }
 export interface UserLeaveInfo extends User { }
@@ -79,6 +81,10 @@ export interface StopVideoInfo {
   to: UserId;
 }
 
+export interface GroupInfo {
+  id: GroupId;
+  users: Array<UserId>;
+}
 
 export interface ClientMessage {
   req_id: string;
@@ -89,5 +95,5 @@ export interface ClientMessage {
 export interface ServerMessage {
   res_id?: string;
   cmd: ServerCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo;
 }

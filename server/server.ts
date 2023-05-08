@@ -140,6 +140,13 @@ class Room {
       from.group = groupId;
     }
     this.send({
+      cmd: "group",
+      data: {
+        id: from.group,
+        users: this.groups[from.group],
+      }
+    });
+    this.send({
       cmd: "offer_video",
       data: {
         from: from.id,
@@ -206,6 +213,13 @@ class Room {
     }
 
     this.groups[from.group] = this.groups[from.group].filter(userId => userId !== from.id && userId !== to.id);
+    this.send({
+      cmd: "group",
+      data: {
+        id: from.group,
+        users: this.groups[from.group],
+      }
+    });
     if (this.groups[from.group].length === 0) {
       delete this.groups[from.group];
     }

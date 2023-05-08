@@ -7,14 +7,15 @@ import { SettingsContext, getPermissions } from './Settings';
 import { playStartVideo, playStopVideo } from './sounds';
 
 import type {
+  AcceptVideoInfo,
   ErrorInfo,
+  GroupInfo,
+  IceCandidateInfo,
+  OfferVideoInfo,
   RoomInfo,
   ServerMessage,
   ServerMsgInfo,
   ServerSnapshotInfo,
-  OfferVideoInfo,
-  AcceptVideoInfo,
-  IceCandidateInfo,
   StopVideoInfo,
   User,
   UserId,
@@ -40,6 +41,7 @@ type VideosState = {
   videoState: VideoState,
   messages: Array<ServerMessage>,
   users: Record<string, UserWithData>,
+  groups: VideoChatGroups,
 };
 
 // TODO: check support for media APIs
@@ -73,6 +75,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     videoState: "off",
     messages: [],
     users: {},
+    groups: {},
   };
 
   static contextType = SettingsContext;
@@ -131,6 +134,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         this.setState({
           users: roomInfo.users,
           id: roomInfo.you,
+          groups: roomInfo.groups,
         });
       break;
       case "offer_video":
@@ -151,8 +155,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       break;
       case "join":
         const userJoinInfo = (msg.data as UserJoinInfo);
-        this.setState({
-          users: { ...this.state.users, [userJoinInfo.user_id]: {...userJoinInfo } },
+        this.setState(prevState => {
+          return {
+            users: { ...prevState.users, [userJoinInfo.user_id]: { ...userJoinInfo } },
+          };
         });
       break;
       case "leave":
@@ -165,14 +171,27 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       break;
       case "snapshot":
         const snapshot = (msg.data as ServerSnapshotInfo);
-        this.setState({
-          users: {
-            ...this.state.users,
-            [snapshot.user_id]: {
-              ...this.state.users[snapshot.user_id],
-              snapshot: snapshot.snapshot,
+        this.setState(prevState => {
+          return {
+            users: {
+              ...prevState.users,
+              [snapshot.user_id]: {
+                ...prevState.users[snapshot.user_id],
+                snapshot: snapshot.snapshot,
+              },
             },
-          },
+          };
+        });
+      break;
+      case "group":
+        const groupInfo = (msg.data as GroupInfo);
+        this.setState(prevState => {
+          return {
+            groups: {
+              ...prevState.groups,
+              [groupInfo.id]: groupInfo.users,
+            }
+          };
         });
       break;
       case "error":
@@ -449,25 +468,45 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.error("already video chatting with", user);
       return;
     }
+
     const cameraStream = await this.startCamera();
     this.playSelfVideo();
 
-    const pc = new RTCPeerConnection(config);
-    for (const track of cameraStream.getTracks()) {
-      pc.addTrack(track, cameraStream);
+    let groupId: string|undefined;
+    for (const [gid, group] of Object.entries(this.state.groups)) {
+      if (group.includes(user.user_id)) {
+        groupId = gid;
+      }
     }
 
-    this.setupPeerConnection(pc, user.user_id);
-    pc.onnegotiationneeded = async () => {
-      await pc.setLocalDescription();
-      this.socket.send({
-        cmd: "offer_video",
-        data: {
-          from: this.state.id, // server ignores this
-          to: user?.user_id ?? "",
-          pc_description: JSON.stringify(pc.localDescription),
+    const users = [user];
+    if (groupId) {
+      for (const uid of this.state.groups[groupId]) {
+        if (uid === user.user_id) {
+          continue;
         }
-      });
+        users.push(this.state.users[uid]);
+      }
+    }
+
+    for (const user of users) {
+      const pc = new RTCPeerConnection(config);
+      for (const track of cameraStream.getTracks()) {
+        pc.addTrack(track, cameraStream);
+      }
+
+      this.setupPeerConnection(pc, user.user_id);
+      pc.onnegotiationneeded = async () => {
+        await pc.setLocalDescription();
+        this.socket.send({
+          cmd: "offer_video",
+          data: {
+            from: this.state.id, // server ignores this
+            to: user?.user_id ?? "",
+            pc_description: JSON.stringify(pc.localDescription),
+          }
+        });
+      }
     }
   }
 
@@ -704,6 +743,8 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
         case "snapshot":
           return <span key={i}></span>;
         case "ice_candidate":
+          return <span key={i}></span>;
+        case "group":
           return <span key={i}></span>;
         default:
           const exhaustiveCheck: never = cmd;
