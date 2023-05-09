@@ -307,7 +307,11 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     })
     if (this.videoSelfRef.current) {
       this.videoSelfRef.current.srcObject = cameraStream;
-      this.videoSelfRef.current.play();
+      try {
+        await this.videoSelfRef.current.play();
+      } catch (e) {
+        console.error(e);
+      }
     } else {
       console.error("No video ref");
     }
