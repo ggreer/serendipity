@@ -746,6 +746,11 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
 };
 
 const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
   return <div id="chat">
     { messages.map((m, i) => {
       const { cmd, data } = m;
@@ -779,5 +784,6 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
           throw new Error(`Unhandled case: ${exhaustiveCheck}`);
       }
     }) }
+    <div ref={bottomRef} />
   </div>;
 };
