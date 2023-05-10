@@ -17,6 +17,7 @@ const commonCommands = [
   "offer_video",
   "ice_candidate",
   "stop_video",
+  "user_info",
 ] as const;
 
 const clientCommands = [
@@ -50,6 +51,14 @@ export type VideoChatGroups = Record<GroupId, Array<UserId>>;
 
 export interface UserJoinInfo extends User { }
 export interface UserLeaveInfo extends User { }
+export interface ClientUserInfo {
+  name: string;
+};
+export interface ServerUserInfo {
+  name: string;
+  user_id: UserId;
+};
+
 export interface RoomInfo {
   name: string;
   you: UserId
@@ -89,11 +98,11 @@ export interface GroupInfo {
 export interface ClientMessage {
   req_id: string;
   cmd: ClientCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo | ClientUserInfo;
 }
 
 export interface ServerMessage {
   res_id?: string;
   cmd: ServerCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo | ServerUserInfo;
 }

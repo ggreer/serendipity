@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useReducer } from 'react';
 
+import { Permissions } from './Permissions';
 import { playTestSound } from './sounds';
 import './Settings.css';
+import './Form.css';
+
 
 const defaultSettings = {
   camera: "",
@@ -10,10 +13,14 @@ const defaultSettings = {
   autoSnapshot: false,
   timeLapse: false,
   playSounds: true,
+  name: "",
+  lastRoom: "",
 };
 
 try {
   const settings = JSON.parse(localStorage.getItem("settings") ?? "");
+  defaultSettings.name = settings.name || "";
+  defaultSettings.lastRoom = settings.lastRoom || "";
   defaultSettings.camera = settings.camera;
   defaultSettings.microphone = settings.microphone;
   defaultSettings.speaker = settings.speaker;
@@ -25,7 +32,16 @@ try {
   console.log("Using default settings.");
 }
 
-export type Action = { type: string, value: string };
+export type ActionType =
+  "setAutoSnapshot" |
+  "setCamera" |
+  "setMicrophone" |
+  "setName" |
+  "setPlaySounds" |
+  "setRoom" |
+  "setSpeaker" |
+  "setTimeLapse";
+export type Action = { type: ActionType, value: string };
 
 export const SettingsContext = createContext(defaultSettings);
 export const SettingsDispatchContext = createContext<React.Dispatch<Action>>((i) => i); // dumb identity function to get around type error
@@ -34,6 +50,18 @@ export const SettingsDispatchContext = createContext<React.Dispatch<Action>>((i)
 function settingsReducer (settings=defaultSettings, action: Action) {
   console.log(action);
   switch (action.type) {
+    case "setName":
+      settings = {
+        ...settings,
+        name: action.value,
+      }
+    break;
+    case "setRoom":
+      settings = {
+        ...settings,
+        lastRoom: action.value,
+      }
+    break;
     case "setCamera":
       settings = {
         ...settings,
@@ -70,6 +98,9 @@ function settingsReducer (settings=defaultSettings, action: Action) {
         playSounds: action.value === "true" ? true : false,
       }
     break;
+    default:
+      const exhaustiveCheck: never = action.type;
+      throw new Error(`Unhandled case: ${exhaustiveCheck}`);
   }
   localStorage.setItem("settings", JSON.stringify(settings));
   return settings;
@@ -88,46 +119,12 @@ export const SettingsProvider = ({ children }: { children: React.ReactNode }) =>
   </SettingsContext.Provider>;
 }
 
-type Permissions = {
-  camera: PermissionState,
-  microphone: PermissionState,
-  autoplay: PermissionState,
-}
-
-export async function getPermissions (): Promise<Permissions> {
-  const cameraPermission = await navigator.permissions.query({ name: "camera" as PermissionName });
-  const micPermission = await navigator.permissions.query({ name: "microphone" as PermissionName });
-  // const autoplayPermission = await navigator.permissions.query({ name: "autoplay" as PermissionName });
-  return {
-    camera: cameraPermission.state,
-    microphone: micPermission.state,
-    autoplay: "granted", // TODO: figure out if brave exposes autoplay permission
-  };
-}
-
-const Permission = ({ value }: { value: PermissionState }) => {
-  if (value === "prompt") {
-    return <>❔</>;
-  }
-  if (value === "denied") {
-    return <>❌</>;
-  }
-  if (value === "granted") {
-    return <>✅</>;
-  }
-  return <>❔❔</>;
-}
 
 export const Settings = () => {
   const settings = useContext(SettingsContext);
   const dispatch = useContext(SettingsDispatchContext);
   const [isOpen, setOpen] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [permissions, setPermissions] = useState<Permissions>({
-    camera: "prompt",
-    microphone: "prompt",
-    autoplay: "prompt",
-  });
 
   async function enumerateDevices () {
     const deviceList = await navigator.mediaDevices?.enumerateDevices();
@@ -140,23 +137,11 @@ export const Settings = () => {
     if (!devices.length) {
       enumerateDevices();
     }
-  }, [permissions]);
+  }, []); // TODO: update if permissions change
   // Update device list if devices change
   navigator.mediaDevices.ondevicechange = (event) => {
     enumerateDevices();
   };
-
-  useEffect(() => {
-    async function getAndSetPermissions () {
-      const perms = await getPermissions();
-      setPermissions({
-        camera: perms.camera,
-        microphone: perms.microphone,
-        autoplay: perms.autoplay,
-      });
-    }
-    getAndSetPermissions();
-  }, []);
 
 
   let cameras: JSX.Element[] = [];
@@ -184,6 +169,12 @@ export const Settings = () => {
     <dialog open={isOpen}>
       <h2>Settings</h2>
       <form method="dialog">
+        <fieldset>
+          <legend>User Info</legend>
+          <label htmlFor="settings-name">Your name</label>
+          <input type="text" name="name" id="settings-name" value={settings.name} onChange={e => dispatch({ type: "setName", value: e.target.value })} />
+        </fieldset>
+
         <fieldset>
           <legend>Options</legend>
           <input type="checkbox" name="auto-snapshot" id="settings-auto-snapshot" checked={settings.autoSnapshot} onChange={e => dispatch({ type: "setAutoSnapshot", value: e.target.checked ? "true" : "false"})} />
@@ -217,12 +208,7 @@ export const Settings = () => {
           <button type="button" onClick={() => playTestSound()}>Test speakers</button>
         </fieldset>
 
-        <fieldset>
-          <legend>Permissions</legend>
-          <Permission value={permissions.camera} /> <label>Camera access</label><br />
-          <Permission value={permissions.microphone} /> <label>Microphone access</label><br />
-          <Permission value={permissions.autoplay} /> <label>Video autoplay</label><br />
-        </fieldset>
+        <Permissions />
 
         <button type="button" onClick={() => setOpen(false)}>Close</button>
       </form>

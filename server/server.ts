@@ -8,6 +8,7 @@ import type {
   ClientMessage,
   ClientMsgInfo,
   ClientSnapshotInfo,
+  ClientUserInfo,
   ServerMessage,
   ServerSnapshotInfo,
   OfferVideoInfo,
@@ -414,6 +415,17 @@ class Connection {
       case "stop_video":
         const svi = (msg.data as StopVideoInfo);
         this.room.stopVideo(svi, this);
+        break;
+      case "user_info":
+        const ui = (msg.data as ClientUserInfo);
+        this.name = ui.name;
+        this.room.send({
+          cmd: "user_info",
+          data: {
+            user_id: this.id,
+            name: this.name,
+          }
+        });
         break;
       default:
         this.respond(msg.req_id, { cmd: "error", data: "Unknown command" });

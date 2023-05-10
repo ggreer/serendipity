@@ -1,12 +1,12 @@
 // handy wrapper for websocket reconnect/json stuff
-import type { ClientMessage } from './protocol';
+import type { ClientMessage, ServerMessage } from './protocol';
 
 export class Socket {
   ws?: WebSocket;
   url: string;
   wsErrors = 0;
   wsReqId = 0;
-  handler?: (a: ClientMessage) => void;
+  handler?: (a: ServerMessage) => void;
   onOpenMsgs: Array<Omit<ClientMessage, "req_id">> = [];
   reconnectTimeout?: NodeJS.Timeout;
 
@@ -15,7 +15,7 @@ export class Socket {
   }
 
   connect () {
-    console.log("connecting to ", this.url);
+    console.log("connecting to", this.url);
     this.onOpenMsgs = [];
     this.ws = new WebSocket(this.url);
     this.ws.onerror = e => this.reconnect(e);
@@ -54,19 +54,22 @@ export class Socket {
     clearTimeout(this.reconnectTimeout);
     this.reconnectTimeout = undefined;
     if (!ws) {
-      console.debug("no websocket. not destroying");
-      return;
+      throw new Error("Can't destroy before connecting!");
     }
     ws.onerror = null;
     ws.onclose = null;
     ws.onmessage = null;
-    console.log("socket destroy: websocket is in state", ws.readyState);
-    if (ws.readyState in [WebSocket.CLOSING, WebSocket.CLOSED]) {
+    ws.onopen = () => {
+      console.log("old websocket finally open. closing");
+      ws.close();
+    };
+    console.log(`socket destroy: websocket is in state ${ws.readyState}`, ws.readyState);
+    if ([WebSocket.CONNECTING, WebSocket.CLOSING, WebSocket.CLOSED].includes(ws.readyState)) {
       console.log("socket destroy: doing nothing because websocket is in state", ws.readyState);
       return;
     }
     ws.close();
-    console.log("socket destroy: websocket is in state", ws.readyState);
+    console.log("socket destroy: websocket closed. websocket is in state", ws.readyState);
   }
 
   send (msg: Omit<ClientMessage, "req_id">) {
@@ -92,7 +95,7 @@ export class Socket {
     this.handler(msg);
   }
 
-  setHandler (handler: (a: ClientMessage) => void) {
+  setHandler (handler: (a: ServerMessage) => void) {
     this.handler = handler;
   }
 }

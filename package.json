@@ -21,6 +21,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "server": "ts-node server/server.ts",
     "build": "react-scripts build && tsc",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

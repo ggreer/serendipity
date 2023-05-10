@@ -1,0 +1,16 @@
+fieldset {
+  min-width: 500px;
+  margin-bottom: 1em;
+}
+label, span.label {
+  min-width: 150px;
+  display: inline-block;
+}
+
+select, input[type="text"], input[type="email"], input[type="password"], input[type="search"], input[type="tel"], input[type="url"] {
+  width: 300px;
+  float: right;
+}
+div.break {
+  margin-bottom: 1em;
+}

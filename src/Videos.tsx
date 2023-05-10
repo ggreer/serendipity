@@ -3,7 +3,8 @@ import classNames from 'classnames';
 
 import './Videos.css';
 
-import { SettingsContext, getPermissions } from './Settings';
+import { SettingsContext } from './Settings';
+import { getPermissions } from './Permissions';
 import { playStartVideo, playStopVideo } from './sounds';
 
 import type {
@@ -16,6 +17,7 @@ import type {
   ServerMessage,
   ServerMsgInfo,
   ServerSnapshotInfo,
+  ServerUserInfo,
   StopVideoInfo,
   User,
   UserId,
@@ -136,6 +138,12 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           id: roomInfo.you,
           groups: roomInfo.groups,
         });
+        this.socket.send({
+          cmd: "user_info",
+          data: {
+            name: this.context.name,
+          }
+        });
       break;
       case "offer_video":
         this.handleOfferVideo(msg.data as OfferVideoInfo);
@@ -190,8 +198,22 @@ export class Videos extends React.Component<VideosProps, VideosState> {
             groups: {
               ...prevState.groups,
               [groupInfo.id]: groupInfo.users,
-            }
+            },
           };
+        });
+      break;
+      case "user_info":
+        const ui = (msg.data as ServerUserInfo);
+        this.setState(prevState => {
+          return {
+            users: {
+              ...prevState.users,
+              [ui.user_id]: {
+                ...prevState.users[ui.user_id],
+                name: ui.name,
+              },
+            },
+          }
         });
       break;
       case "error":
@@ -310,7 +332,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       try {
         await this.videoSelfRef.current.play();
       } catch (e) {
-        console.error(e);
+        console.error("Error playing self video:", e);
       }
     } else {
       console.error("No video ref");
@@ -749,6 +771,8 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
         case "ice_candidate":
           return <span key={i}></span>;
         case "group":
+          return <span key={i}></span>;
+        case "user_info":
           return <span key={i}></span>;
         default:
           const exhaustiveCheck: never = cmd;

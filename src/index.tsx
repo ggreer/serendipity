@@ -9,6 +9,8 @@ import './index.css';
 import { App } from './App';
 import { ErrorPage } from './ErrorPage';
 import { Videos } from './Videos';
+import { About } from './About';
+import { LandingPage } from './LandingPage';
 
 
 const router = createBrowserRouter([
@@ -17,6 +19,14 @@ const router = createBrowserRouter([
     element: <App />,
     errorElement: <ErrorPage />,
     children: [{
+      index: true,
+      element: <LandingPage />,
+    },
+    {
+      path: "about",
+      element: <About />,
+    },
+    {
       path: ":roomName",
       element: <Videos />,
     }],
