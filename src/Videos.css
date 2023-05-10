@@ -6,7 +6,8 @@
 }
 
 #chat {
-  height: 300px;
+  min-height: 50px;
+  max-height: 300px;
   border: 1px black solid;
   overflow-y: auto;
 }

@@ -1,5 +1,6 @@
 button.settings {
   float: right;
+  margin-right: 0;
 }
 dialog {
   z-index: 10;
