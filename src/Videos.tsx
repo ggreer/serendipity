@@ -684,10 +684,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     return <div className="videos">
       { cameraStream
         ? <>
-          <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Turn off camera</button>
-          <button type="button" onClick={() => this.snapshot()} disabled={!cameraStream}>Retake snapshot</button>
+          <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Disable camera</button>
+          <button type="button" onClick={() => this.snapshot()} disabled={!cameraStream}>Re-take snapshot</button>
         </>
-        : <button type="button" onClick={() => this.startSnapshots()} disabled={!!cameraStream}>Turn on camera</button>
+        : <button type="button" onClick={() => this.startSnapshots()} disabled={!!cameraStream}>Enable camera</button>
       }
       { videoState === "on"
         ? <button type="button" onClick={() => this.stopVideo()}>Stop all video chat</button>

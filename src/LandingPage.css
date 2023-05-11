@@ -1,4 +1,6 @@
-div#intro {
-  margin-left: 1em;
-  margin-right: 1em;
+@media(min-width: 640px) {
+  div#intro {
+    margin-left: 1em;
+    margin-right: 1em;
+  }
 }
