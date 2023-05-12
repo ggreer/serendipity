@@ -165,7 +165,7 @@ export const Settings = () => {
   });
 
   return <>
-    <button type="button" className="settings" onClick={() => setOpen(!isOpen)}>⚙ Settings</button>
+    <button type="button" className="settings" onClick={() => setOpen(!isOpen)}>⚙️ Settings</button>
     <dialog open={isOpen}>
       <h2>Settings</h2>
       <form method="dialog">

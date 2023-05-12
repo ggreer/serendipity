@@ -49,6 +49,12 @@ img.placeholder {
 .user_tile.self {
   border: 1px blue solid;
 }
+.user_tile button {
+  margin: 0 0 0 10px;
+  padding: 0;
+  float: right;
+  min-height: auto;
+}
 
 button {
   min-height: 30px;

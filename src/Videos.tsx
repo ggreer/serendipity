@@ -710,19 +710,18 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           if (u.user_id === id) {
             return <span key={u.user_id}></span>;
           }
-          return <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} actions={{
-            kick: () => this.kick(u),
-          }} />
+          const actions = {
+            "kick": { icon: "⏏️", fn: () => this.kick(u)},
+//            "mute": { icon: "", fn: () => this.mute(u)},
+          };
+          return <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} actions={actions} />
         })}
       </>;
     }
 
     return <div className="videos">
       { cameraStream
-        ? <>
-          <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Disable camera</button>
-          <button type="button" onClick={() => this.snapshot()} disabled={!cameraStream}>Re-take snapshot</button>
-        </>
+        ? <button type="button" onClick={() => this.stopSnapshots()} disabled={!cameraStream}>Disable camera</button>
         : <button type="button" onClick={() => this.startSnapshots()} disabled={!!cameraStream}>Enable camera</button>
       }
       { videoState === "on"
@@ -763,7 +762,7 @@ type UserTileProps = {
   user: UserWithData,
   isSelf: boolean,
   onClick: () => void,
-  actions: Record<string, () => void>,
+  actions: Record<string, { icon: string, fn: () => void}>,
 };
 
 const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
@@ -787,7 +786,7 @@ const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
       onClick={onClick}
     />
     { user.name } { isSelf ? "(You)" : "" }
-    { Object.entries(actions).map(([name, fn]) => <button type="button" onClick={fn}>{name}</button>)}
+    { Object.entries(actions).map(([name, v]) => <button type="button" title={name} onClick={v.fn}>{v.icon}</button>)}
   </div>;
 };
 
