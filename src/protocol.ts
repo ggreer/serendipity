@@ -22,6 +22,7 @@ const commonCommands = [
 
 const clientCommands = [
   "msg",
+  "kick",
 ] as const;
 
 const serverCommands = [
@@ -38,6 +39,10 @@ export type ServerCommand = typeof commonCommands[number] | typeof serverCommand
 
 
 export type ClientMsgInfo = string;
+export interface KickInfo {
+  user_id: UserId,
+  ban: boolean,
+};
 
 export type ErrorInfo = string;
 
@@ -98,7 +103,7 @@ export interface GroupInfo {
 export interface ClientMessage {
   req_id: string;
   cmd: ClientCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo | ClientUserInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo | ClientUserInfo | KickInfo;
 }
 
 export interface ServerMessage {

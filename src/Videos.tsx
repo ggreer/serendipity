@@ -570,6 +570,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
   }
 
+  kick (user: UserWithData) {
+    this.socket.send({
+      cmd: "kick",
+      data: {
+        user_id: user.user_id,
+        ban: false,
+      }
+    });
+  }
+
   async handleOfferVideo (ovi: OfferVideoInfo) {
     // someone wants to video chat with us
     if (ovi.from === this.state.id) {
@@ -675,9 +685,19 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
     let userContent = <>Connecting...</>;
     if (id && me) {
+      const selfActions = {
+        onClick: () => this.snapshot(),
+      }
       userContent = <>
-        { <UserTile user={me} isSelf={true} onClick={() => this.snapshot()} /> }
-        { Object.values(users).map((u, i) => u.user_id === id ? <span key={u.user_id}></span> : <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} />) }
+        <UserTile user={me} isSelf={true} actions={{}} onClick={() => this.snapshot()} />
+        { Object.values(users).map((u, i) => {
+          if (u.user_id === id) {
+            return <span key={u.user_id}></span>;
+          }
+          return <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} actions={{
+            kick: () => this.kick(u),
+          }} />
+        })}
       </>;
     }
 
@@ -708,7 +728,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
 type VideoProps = VideoHTMLAttributes<HTMLVideoElement> & {
   srcObject?: MediaStream
-}
+};
 
 const Video = ({ srcObject, ...props }: VideoProps) => {
   const refVideo = useRef<HTMLVideoElement>(null)
@@ -723,7 +743,14 @@ const Video = ({ srcObject, ...props }: VideoProps) => {
   return <video ref={refVideo} {...props} />
 };
 
-const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boolean, onClick: () => void }) => {
+type UserTileProps = {
+  user: UserWithData,
+  isSelf: boolean,
+  onClick: () => void,
+  actions: Record<string, () => void>,
+};
+
+const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
   const showVideo = user.mediaStream;
   return <div className={classNames("user_tile", { self: isSelf })} onClick={onClick}>
     <Video
@@ -739,9 +766,10 @@ const UserTile = ({ user, isSelf, onClick }: { user: UserWithData, isSelf: boole
       alt={user.name}
       src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.svg`}
       style={{ display: showVideo ? "none" : undefined }}
-      title="Click to start video chat."
+      title={ isSelf ? "Click to re-take snapshot" : "Click to start video chat." }
     />
     { user.name } { isSelf ? "(You)" : "" }
+    { Object.entries(actions).map(([name, fn]) => <button type="button" onClick={fn}>{name}</button>)}
   </div>;
 };
 

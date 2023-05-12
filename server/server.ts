@@ -5,15 +5,16 @@ import { parse } from "url";
 import { WebSocket, WebSocketServer } from "ws";
 
 import type {
+  AcceptVideoInfo,
   ClientMessage,
   ClientMsgInfo,
   ClientSnapshotInfo,
   ClientUserInfo,
+  IceCandidateInfo,
+  KickInfo,
+  OfferVideoInfo,
   ServerMessage,
   ServerSnapshotInfo,
-  OfferVideoInfo,
-  AcceptVideoInfo,
-  IceCandidateInfo,
   StopVideoInfo,
   User,
   UserId,
@@ -110,6 +111,11 @@ class Room {
     if (Object.values(this.conns).length === 0) {
       destroyRoom(this);
     }
+  }
+
+  kick (ki: KickInfo) {
+    const conn = this.conns[ki.user_id];
+    conn.destroy();
   }
 
   offerVideo (ovi: OfferVideoInfo, from: Connection) {
@@ -426,6 +432,10 @@ class Connection {
             name: this.name,
           }
         });
+        break;
+      case "kick":
+        const ki = (msg.data as KickInfo);
+        this.room.kick(ki);
         break;
       default:
         this.respond(msg.req_id, { cmd: "error", data: "Unknown command" });
