@@ -12,6 +12,7 @@ import type {
   ErrorInfo,
   GroupInfo,
   IceCandidateInfo,
+  KickInfo,
   OfferVideoInfo,
   RoomInfo,
   ServerMessage,
@@ -215,6 +216,21 @@ export class Videos extends React.Component<VideosProps, VideosState> {
             },
           }
         });
+      break;
+      case "kick":
+        const ki = (msg.data as KickInfo);
+        if (ki.user_id === this.state.id) {
+          this.socket.destroy();
+          this.stopSnapshots();
+          this.setState({
+            id: "",
+            cameraStream: undefined,
+            videoState: "off",
+            messages: [],
+            users: {},
+            groups: {},
+          });
+        }
       break;
       case "error":
         console.error(msg.data);
@@ -752,7 +768,7 @@ type UserTileProps = {
 
 const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
   const showVideo = user.mediaStream;
-  return <div className={classNames("user_tile", { self: isSelf })} onClick={onClick}>
+  return <div className={classNames("user_tile", { self: isSelf })}>
     <Video
       className="user_video"
       srcObject={user.mediaStream}
@@ -760,6 +776,7 @@ const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
       muted={isSelf}
       style={{ display: showVideo ? undefined : "none" }}
       title="Click to stop video chat."
+      onClick={onClick}
     />
     <img
       className={classNames("user_image", {"placeholder": !user.snapshot})}
@@ -767,6 +784,7 @@ const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
       src={user.snapshot || `${process.env.PUBLIC_URL}/portrait_placeholder.svg`}
       style={{ display: showVideo ? "none" : undefined }}
       title={ isSelf ? "Click to re-take snapshot" : "Click to start video chat." }
+      onClick={onClick}
     />
     { user.name } { isSelf ? "(You)" : "" }
     { Object.entries(actions).map(([name, fn]) => <button type="button" onClick={fn}>{name}</button>)}
@@ -807,6 +825,8 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
           return <span key={i}></span>;
         case "user_info":
           return <span key={i}></span>;
+        case "kick":
+          return <span key={i}>Kicked</span>;
         default:
           const exhaustiveCheck: never = cmd;
           throw new Error(`Unhandled case: ${exhaustiveCheck}`);

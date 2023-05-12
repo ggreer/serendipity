@@ -106,6 +106,9 @@ class Room {
   }
 
   remove (conn: Connection) {
+    if (!this.conns[conn.id]) {
+      return;
+    }
     delete this.conns[conn.id];
     this.send({ cmd: "leave", data: { user_id: conn.id, name: conn.name } });
     if (Object.values(this.conns).length === 0) {
@@ -113,8 +116,22 @@ class Room {
     }
   }
 
-  kick (ki: KickInfo) {
+  async kick (ki: KickInfo) {
     const conn = this.conns[ki.user_id];
+    conn.send({
+      cmd: "kick",
+      data: {
+        user_id: ki.user_id,
+        ban: ki.ban,
+      }
+    });
+    // wait up to a second for stuff to be sent before disconnecting user
+    for (let i = 0; i < 10; i++) {
+      if (conn.ws.bufferedAmount === 0) {
+        break;
+      }
+      await new Promise<void>((resolve) => setTimeout(() => resolve(), 100));
+    }
     conn.destroy();
   }
 
@@ -269,6 +286,7 @@ class Connection {
   snapshot: string;
   room: Room;
   group: string|null;
+  destroyed: boolean;
 
   constructor (ws: WebSocket, req: IncomingMessage) {
     this.ws = ws;
@@ -276,6 +294,7 @@ class Connection {
     this.id = `userid_${ids++}`;
     this.isAlive = true;
     this.group = null;
+    this.destroyed = false;
     console.log(`Connection from ${this.toString()}`);
 
     ws.on("close", (code, reason) => {
@@ -445,6 +464,10 @@ class Connection {
   }
 
   destroy () {
+    if (this.destroyed) {
+      return;
+    }
+    this.destroyed = true;
     this.room.remove(this);
     this.ws.terminate();
     clearInterval(this.heartbeatInterval);

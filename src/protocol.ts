@@ -10,19 +10,19 @@ export interface UserInfo {
 }
 
 const commonCommands = [
-  "error",
-  "msg",
-  "snapshot",
   "accept_video",
-  "offer_video",
+  "error",
   "ice_candidate",
+  "kick",
+  "msg",
+  "offer_video",
+  "snapshot",
   "stop_video",
   "user_info",
 ] as const;
 
 const clientCommands = [
   "msg",
-  "kick",
 ] as const;
 
 const serverCommands = [
@@ -109,5 +109,5 @@ export interface ClientMessage {
 export interface ServerMessage {
   res_id?: string;
   cmd: ServerCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo | ServerUserInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo | ServerUserInfo | KickInfo;
 }
