@@ -40,10 +40,10 @@ export function LandingPage () {
       <fieldset>
         <legend>Join a room</legend>
         <label htmlFor="settings-name">Your name</label>
-        <input type="text" name="name" id="settings-name" value={settings.name} onChange={e => dispatch({ type: "setName", value: e.target.value })} />
+        <input type="text" name="name" id="settings-name" value={settings.name} onChange={e => dispatch({ type: "setString", name: "name", value: e.target.value })} />
         <div className="break" />
         <label htmlFor="room-name">Room name</label>
-        <input type="text" name="room" id="room-name" value={settings.lastRoom} onChange={e => dispatch({ type: "setRoom", value: e.target.value })} />
+        <input type="text" name="room" id="room-name" value={settings.lastRoom} onChange={e => dispatch({ type: "setString", name: "lastRoom", value: e.target.value })} />
         <div className="break" />
         <div style={{ minWidth: 308, float: "right" }}>
           <button type="submit" disabled={!settings.name || !settings.lastRoom}>Join room</button>

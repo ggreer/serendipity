@@ -7,6 +7,7 @@ export interface User {
 export interface UserInfo {
   snapshot: string;
   group: GroupId|null;
+  muted: boolean;
 }
 
 const commonCommands = [
@@ -15,6 +16,7 @@ const commonCommands = [
   "ice_candidate",
   "kick",
   "msg",
+  "mute",
   "offer_video",
   "snapshot",
   "stop_video",
@@ -42,6 +44,10 @@ export type ClientMsgInfo = string;
 export interface KickInfo {
   user_id: UserId,
   ban: boolean,
+};
+export interface MuteInfo {
+  user_id: UserId,
+  mute: boolean,
 };
 
 export type ErrorInfo = string;
@@ -103,11 +109,11 @@ export interface GroupInfo {
 export interface ClientMessage {
   req_id: string;
   cmd: ClientCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo | ClientUserInfo | KickInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | ClientMsgInfo | ClientSnapshotInfo | ClientUserInfo | KickInfo | MuteInfo;
 }
 
 export interface ServerMessage {
   res_id?: string;
   cmd: ServerCommand;
-  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo | ServerUserInfo | KickInfo;
+  data: ErrorInfo | OfferVideoInfo | AcceptVideoInfo | IceCandidateInfo | StopVideoInfo | RoomInfo | ServerMsgInfo | ServerSnapshotInfo | UserJoinInfo | UserLeaveInfo | GroupInfo | ServerUserInfo | KickInfo | MuteInfo;
 }

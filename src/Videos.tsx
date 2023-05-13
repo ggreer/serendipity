@@ -13,6 +13,7 @@ import type {
   GroupInfo,
   IceCandidateInfo,
   KickInfo,
+  MuteInfo,
   OfferVideoInfo,
   RoomInfo,
   ServerMessage,
@@ -34,6 +35,7 @@ import { Socket, socket } from './socket';
 type UserWithData = User & {
   snapshot?: string,
   mediaStream?: MediaStream,
+  muted: boolean,
 };
 
 type VideosProps = {};
@@ -139,12 +141,14 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           id: roomInfo.you,
           groups: roomInfo.groups,
         });
-        this.socket.send({
-          cmd: "user_info",
-          data: {
-            name: this.context.name,
-          }
-        });
+        if (this.context.name) {
+          this.socket.send({
+            cmd: "user_info",
+            data: {
+              name: this.context.name,
+            }
+          });
+        }
       break;
       case "offer_video":
         this.handleOfferVideo(msg.data as OfferVideoInfo);
@@ -164,9 +168,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       break;
       case "join":
         const userJoinInfo = (msg.data as UserJoinInfo);
+
         this.setState(prevState => {
           return {
-            users: { ...prevState.users, [userJoinInfo.user_id]: { ...userJoinInfo } },
+            users: { ...prevState.users, [userJoinInfo.user_id]: { ...userJoinInfo, muted: false } },
           };
         });
       break;
@@ -231,6 +236,15 @@ export class Videos extends React.Component<VideosProps, VideosState> {
             groups: {},
           });
         }
+      break;
+      case "mute":
+        const mi = (msg.data as MuteInfo);
+        this.setState(prevState => {
+          const u = prevState.users[mi.user_id];
+          return {
+            users: { ...prevState.users, [mi.user_id]: {...u, muted: mi.mute } },
+          };
+        });
       break;
       case "error":
         console.error(msg.data);
@@ -596,6 +610,38 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     });
   }
 
+  mute (user: UserWithData) {
+    this.setState(prevState => {
+      const u = prevState.users[user.user_id];
+      return {
+        users: { ...prevState.users, [user.user_id]: {...u, muted: true } },
+      };
+    });
+    this.socket.send({
+      cmd: "mute",
+      data: {
+        user_id: user.user_id,
+        mute: true,
+      }
+    });
+  }
+
+  unmute (user: UserWithData) {
+    this.setState(prevState => {
+      const u = prevState.users[user.user_id];
+      return {
+        users: { ...prevState.users, [user.user_id]: {...u, muted: false } },
+      };
+    });
+    this.socket.send({
+      cmd: "mute",
+      data: {
+        user_id: user.user_id,
+        mute: false,
+      }
+    });
+  }
+
   async handleOfferVideo (ovi: OfferVideoInfo) {
     // someone wants to video chat with us
     if (ovi.from === this.state.id) {
@@ -710,10 +756,14 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           if (u.user_id === id) {
             return <span key={u.user_id}></span>;
           }
-          const actions = {
+          const actions: Actions = {
             "kick": { icon: "⏏️", fn: () => this.kick(u)},
-//            "mute": { icon: "", fn: () => this.mute(u)},
           };
+          if (u.muted) {
+            actions.unmute = { icon: "🔊", fn: () => this.unmute(u) };
+          } else {
+            actions.mute = { icon: "🔇", fn: () => this.mute(u) };
+          }
           return <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} actions={actions} />
         })}
       </>;
@@ -758,11 +808,12 @@ const Video = ({ srcObject, ...props }: VideoProps) => {
   return <video ref={refVideo} {...props} />
 };
 
+type Actions = Record<string, { icon: string, fn: () => void}>;
 type UserTileProps = {
   user: UserWithData,
   isSelf: boolean,
   onClick: () => void,
-  actions: Record<string, { icon: string, fn: () => void}>,
+  actions: Actions,
 };
 
 const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
@@ -772,7 +823,7 @@ const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
       className="user_video"
       srcObject={user.mediaStream}
       playsInline
-      muted={isSelf}
+      muted={isSelf || user.muted}
       style={{ display: showVideo ? undefined : "none" }}
       title="Click to stop video chat."
       onClick={onClick}
@@ -826,6 +877,9 @@ const Messages = ({ messages }: { messages: Array<ServerMessage>, }) => {
           return <span key={i}></span>;
         case "kick":
           return <span key={i}>Kicked</span>;
+        case "mute":
+          const mi = (data as MuteInfo);
+          return <code key={i}> { mi.mute ? "Muted" : "Unmuted" } { mi.user_id }<br /></code>;
         default:
           const exhaustiveCheck: never = cmd;
           throw new Error(`Unhandled case: ${exhaustiveCheck}`);

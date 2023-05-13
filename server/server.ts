@@ -12,6 +12,7 @@ import type {
   ClientUserInfo,
   IceCandidateInfo,
   KickInfo,
+  MuteInfo,
   OfferVideoInfo,
   ServerMessage,
   ServerSnapshotInfo,
@@ -118,6 +119,10 @@ class Room {
 
   async kick (ki: KickInfo) {
     const conn = this.conns[ki.user_id];
+    if (!conn) {
+      console.error(`kick: user ${ki.user_id} doesn't exist`);
+      return;
+    }
     conn.send({
       cmd: "kick",
       data: {
@@ -287,6 +292,7 @@ class Connection {
   room: Room;
   group: string|null;
   destroyed: boolean;
+  muted: boolean;
 
   constructor (ws: WebSocket, req: IncomingMessage) {
     this.ws = ws;
@@ -295,6 +301,7 @@ class Connection {
     this.isAlive = true;
     this.group = null;
     this.destroyed = false;
+    this.muted = false;
     console.log(`Connection from ${this.toString()}`);
 
     ws.on("close", (code, reason) => {
@@ -357,6 +364,7 @@ class Connection {
         user_id: conn.id,
         snapshot: conn.snapshot,
         group: conn.group,
+        muted: conn.muted,
       }
     }
     this.send({
@@ -456,10 +464,26 @@ class Connection {
         const ki = (msg.data as KickInfo);
         this.room.kick(ki);
         break;
+      case "mute":
+        const mi = (msg.data as MuteInfo);
+        const conn = this.room.conns[mi.user_id];
+        if (!conn) {
+          this.send({ cmd: "error", data: `mute: user ${mi.user_id} doesn't exist` })
+          return;
+        }
+        conn.muted = mi.mute;
+        this.room.send({
+          cmd: "mute",
+          data: {
+            user_id: mi.user_id,
+            mute: mi.mute,
+          },
+        });
+        break;
       default:
         this.respond(msg.req_id, { cmd: "error", data: "Unknown command" });
         const exhaustiveCheck: never = msg.cmd;
-        // throw new Error(`Unhandled case: ${exhaustiveCheck}`);
+        throw new Error(`Unhandled case: ${exhaustiveCheck}`);
     }
   }
 
