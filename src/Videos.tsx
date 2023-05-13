@@ -73,6 +73,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   socket: Socket;
   // ws?: WebSocket;
   pcs: Record<UserId, RTCPeerConnection>;
+  notifications: Array<Notification>;
 
   state: VideosState = {
     id: "",
@@ -91,10 +92,18 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.pcs = {};
     this.socket = socket;
     this.socket.setHandler(msg => this.handleMsg(msg));
+    this.notifications = [];
   }
 
   componentDidMount () {
     console.log("mounted");
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") {
+        for (const n of this.notifications) {
+          n.close();
+        }
+      }
+    });
     this.socket.connect();
 
     const maybeStartSnapshots = async () => {
@@ -137,7 +146,16 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.error("Notifications enabled but notification permission not granted.");
       return;
     }
+    if (document.visibilityState === "visible") {
+      console.log("Not notifying because document is visible");
+      return;
+    }
     const notification = new Notification(msg);
+    this.notifications.push(notification);
+    setTimeout(() => {
+      notification.close();
+      this.notifications = this.notifications.filter(n => n === notification);
+    }, 5000);
   }
 
   handleMsg (msg: ServerMessage) {
