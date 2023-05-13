@@ -128,6 +128,18 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     }
   }
 
+  notify (msg: string) {
+    if (!this.context.notifications) {
+      console.log("Notifications disabled");
+      return;
+    }
+    if (Notification.permission !== "granted") {
+      console.error("Notifications enabled but notification permission not granted.");
+      return;
+    }
+    const notification = new Notification(msg);
+  }
+
   handleMsg (msg: ServerMessage) {
     const messages = this.state.messages;
     messages.push(msg);
@@ -168,7 +180,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       break;
       case "join":
         const userJoinInfo = (msg.data as UserJoinInfo);
-
+        this.notify(`${userJoinInfo.name} joined`);
         this.setState(prevState => {
           return {
             users: { ...prevState.users, [userJoinInfo.user_id]: { ...userJoinInfo, muted: false } },
@@ -179,6 +191,8 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         this.setState(prevState => {
           const userLeaveInfo = (msg.data as UserLeaveInfo);
           const users = { ...prevState.users };
+          const user = users[userLeaveInfo.user_id];
+          this.notify(`${user.name} left`);
           delete users[userLeaveInfo.user_id];
           return { messages, users };
         });
@@ -444,6 +458,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
         }
         this.setState(prevState => {
           const u = prevState.users[userId];
+          this.notify(`Started video chat with ${u.name}`);
           return {
             users: { ...prevState.users, [userId]: {...u, mediaStream: streams[0] } },
           };
@@ -460,6 +475,8 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       console.error(`No user found for id ${userId}`);
       return;
     }
+    this.notify(`Stopped video chat with ${user.name}`);
+
     if (user.mediaStream) {
       if (this.context.playSounds) {
         playStopVideo();
