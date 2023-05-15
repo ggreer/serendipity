@@ -370,7 +370,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     let isCameraWorking = true;
     if (cameraStream) {
       for (const track of cameraStream.getTracks()) {
-        console.log(track);
         if (track.readyState === "ended") {
           isCameraWorking = false;
         }
@@ -871,7 +870,7 @@ const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
       title={ isSelf ? "Click to re-take snapshot" : "Click to start video chat." }
       onClick={onClick}
     />
-    { user.name } { isSelf ? "(You)" : "" }
+    { user.name } { isSelf ? <span style={{ float: "right" }}>(You)</span> : "" }
     { Object.entries(actions).map(([name, v]) => <button type="button" title={name} onClick={v.fn}>{v.icon}</button>)}
   </div>;
 };

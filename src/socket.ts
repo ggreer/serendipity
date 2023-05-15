@@ -15,14 +15,14 @@ export class Socket {
   }
 
   connect () {
-    console.log("connecting to", this.url);
+    console.debug("connecting to", this.url);
     this.onOpenMsgs = [];
     this.ws = new WebSocket(this.url);
     this.ws.onerror = e => this.reconnect(e);
     this.ws.onclose = e => this.reconnect(e);
     this.ws.onmessage = e => this.handleMsg(e);
     this.ws.onopen = e => {
-      console.log("connection opened to", this.url);
+      console.debug("connection opened to", this.url);
       for (const m of this.onOpenMsgs) {
         this.send(m);
       }
@@ -41,7 +41,7 @@ export class Socket {
     clearTimeout(this.reconnectTimeout);
     this.reconnectTimeout = setTimeout(() => {
       if (this.ws?.readyState === WebSocket.CONNECTING) {
-        console.log("websocket connecting. not trying to connect");
+        console.debug("websocket connecting. not trying to connect");
         return;
       }
 
@@ -60,16 +60,16 @@ export class Socket {
     ws.onclose = null;
     ws.onmessage = null;
     ws.onopen = () => {
-      console.log("old websocket finally open. closing");
+      console.debug("old websocket finally open. closing");
       ws.close();
     };
-    console.log(`socket destroy: websocket is in state ${ws.readyState}`, ws.readyState);
+    console.debug(`socket destroy: websocket is in state ${ws.readyState}`, ws.readyState);
     if ([WebSocket.CONNECTING, WebSocket.CLOSING, WebSocket.CLOSED].includes(ws.readyState)) {
-      console.log("socket destroy: doing nothing because websocket is in state", ws.readyState);
+      console.debug("socket destroy: doing nothing because websocket is in state", ws.readyState);
       return;
     }
     ws.close();
-    console.log("socket destroy: websocket closed. websocket is in state", ws.readyState);
+    console.debug("socket destroy: websocket closed. websocket is in state", ws.readyState);
   }
 
   send (msg: Omit<ClientMessage, "req_id">) {
@@ -82,17 +82,22 @@ export class Socket {
       console.debug(ws.readyState, "queued", msg);
       return;
     }
-    console.log("sending", msg);
+    console.debug("sending", msg);
     ws.send(JSON.stringify({ ...msg, req_id: `req_${this.wsReqId++}`, }));
   }
 
   handleMsg (event: MessageEvent) {
     const msg = JSON.parse(event.data);
     if (!this.handler) {
+      console.debug("No handler for", msg);
       return;
     }
-    console.log("got", msg);
-    this.handler(msg);
+    console.debug("got", msg);
+    try {
+      this.handler(msg);
+    } catch (e) {
+      console.error("Error handling", msg, e);
+    }
   }
 
   setHandler (handler: (a: ServerMessage) => void) {
