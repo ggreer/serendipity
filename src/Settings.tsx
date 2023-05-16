@@ -53,6 +53,19 @@ export const SettingsContext = createContext(defaultSettings);
 export const SettingsDispatchContext = createContext<React.Dispatch<Action>>((i) => i); // dumb identity function to get around type error
 
 
+async function testNotification () {
+  const notificationPermission = await navigator.permissions.query({ name: "notifications" });
+  if (notificationPermission.state !== "granted") {
+    Notification.requestPermission();
+  }
+
+  const notification = new Notification("Test");
+  setTimeout(() => {
+    notification.close();
+  }, 5000);
+}
+
+
 function settingsReducer (settings=defaultSettings, action: Action) {
   console.log(action);
   switch (action.type) {
@@ -183,6 +196,7 @@ export const Settings = () => {
           <div className="break" />
 
           <button type="button" onClick={() => playTestSound()}>Test speakers</button>
+          <button type="button" onClick={() => testNotification()}>Test notification</button>
         </fieldset>
 
         <Permissions />
