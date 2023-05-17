@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 
-import { MicTest } from './MicTest';
 
 type PermissionsType = {
   autoplay: PermissionState,
@@ -74,7 +73,7 @@ export function Permissions () {
   return <fieldset>
     <legend>Permissions</legend>
     <Permission value={permissions.camera} /> <label>Camera access</label><br />
-    <Permission value={permissions.microphone} /> <label>Microphone access</label> <MicTest /><br />
+    <Permission value={permissions.microphone} /> <label>Microphone access</label><br />
     <Permission value={permissions.notifications} /> <label>Notifications</label><br />
     <Permission value={permissions.autoplay} /> <label>Video autoplay</label><br />
   </fieldset>;
