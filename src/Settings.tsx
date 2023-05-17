@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useReducer } from 'react';
 
-import { Permissions } from './Permissions';
+import { Permissions, onPermissionChange } from './Permissions';
 import { playTestSound } from './sounds';
 import './Settings.css';
 import './Form.css';
@@ -120,14 +120,14 @@ export const Settings = () => {
     }
   }
   useEffect(() => {
+    // Update device list if devices change
+    navigator.mediaDevices.ondevicechange = event => enumerateDevices();
+    // Update device list if permissions change
+    onPermissionChange(enumerateDevices);
     if (!devices.length) {
       enumerateDevices();
     }
-  }, []); // TODO: update if permissions change
-  // Update device list if devices change
-  navigator.mediaDevices.ondevicechange = (event) => {
-    enumerateDevices();
-  };
+  });
 
 
   let cameras: JSX.Element[] = [];
@@ -196,7 +196,7 @@ export const Settings = () => {
           <div className="break" />
 
           <button type="button" onClick={() => playTestSound()}>Test speakers</button>
-          <button type="button" onClick={() => testNotification()}>Test notification</button>
+          <button type="button" onClick={() => testNotification()}>Test notifications</button>
         </fieldset>
 
         <Permissions />

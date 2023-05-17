@@ -4,7 +4,7 @@ import classNames from 'classnames';
 import './Videos.css';
 
 import { SettingsContext } from './Settings';
-import { getPermissions } from './Permissions';
+import { getPermissionsStates } from './Permissions';
 import { playStartVideo, playStopVideo } from './sounds';
 
 import type {
@@ -107,7 +107,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.socket.connect();
 
     const maybeStartSnapshots = async () => {
-      const { camera, microphone } = await getPermissions();
+      const { camera, microphone } = await getPermissionsStates();
       if (camera === "granted" && microphone === "granted") {
         this.startSnapshots();
       }
@@ -383,7 +383,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           facingMode: "user", // Prefer selfie cam if on mobile
           deviceId: this.context.camera,
         },
-        audio: true,
+        audio: {
+          deviceId: this.context.microphone,
+        },
       });
     this.setState({
       cameraStream,
@@ -781,9 +783,6 @@ export class Videos extends React.Component<VideosProps, VideosState> {
 
     let userContent = <>Connecting...</>;
     if (id && me) {
-      const selfActions = {
-        onClick: () => this.snapshot(),
-      }
       userContent = <>
         <UserTile user={me} isSelf={true} actions={{}} onClick={() => this.snapshot()} />
         { Object.values(users).map((u, i) => {
