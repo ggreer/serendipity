@@ -784,7 +784,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     let userContent = <>Connecting...</>;
     if (id && me) {
       userContent = <>
-        <UserTile user={me} isSelf={true} actions={{}} onClick={() => this.snapshot()} />
+        <UserTile user={me} isSelf={true} actions={{}} onClick={() => this.startSnapshots()} />
         { Object.values(users).map((u, i) => {
           if (u.user_id === id) {
             return <span key={u.user_id}></span>;
