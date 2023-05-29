@@ -13,7 +13,7 @@
 
 
 # Build deps without dev dependencies
-FROM node:20-alpine
+FROM --platform=$BUILDPLATFORM node:20-alpine
 WORKDIR /run/server
 ENV NODE_ENV production
 COPY package.json yarn.lock ./
@@ -21,7 +21,7 @@ RUN yarn install --frozen-lockfile
 
 
 # Build JS
-FROM node:20-alpine
+FROM --platform=$BUILDPLATFORM node:20-alpine
 WORKDIR /run/server
 ENV NODE_ENV production
 # Copy node_modules from previous image to speed up build time
@@ -32,7 +32,7 @@ RUN yarn install --production=false --frozen-lockfile && \
 
 
 # Run
-FROM node:20-alpine
+FROM --platform=$BUILDPLATFORM node:20-alpine
 WORKDIR /run/server
 EXPOSE 80
 # Copy built production node_modules
