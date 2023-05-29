@@ -1,7 +1,7 @@
-# syntax=docker/dockerfile:1.0.0-experimental
+# syntax=docker/dockerfile:1
 
 # Build me with:
-# DOCKER_BUILDKIT=1 docker build --ssh default -t server:latest --file server.Dockerfile .
+# DOCKER_BUILDKIT=1 docker build --platform linux/amd64,linux/arm64 --ssh default -t server:latest --file server.Dockerfile .
 
 # Run me locally with:
 # docker run -it --init -p 3000:80 server:latest
