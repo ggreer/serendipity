@@ -771,18 +771,22 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   stopVideo (user?: UserWithData) {
-    if (!user) {
-      for (const [id, user] of Object.entries(this.state.users)) {
-        if (id === this.state.id) {
-          // Don't try to start video chat with self
-          continue;
-        }
-        this.stopVideo(user);
-      }
+    if (user) {
+      this.destroyPeerConnection(user.user_id);
       return;
     }
 
-    this.destroyPeerConnection(user.user_id);
+    for (const [id, user] of Object.entries(this.state.users)) {
+      if (id === this.state.id) {
+        // Don't try to stop video chat with self
+        continue;
+      }
+      try {
+        this.stopVideo(user);
+      } catch (e) {
+        console.error(e);
+      }
+    }
   }
 
   sendMessage (e: React.FormEvent<HTMLFormElement>) {
