@@ -7,6 +7,7 @@ import './Form.css';
 
 
 const defaultSettings = {
+  autoAnswer: false,
   autoSnapshot: false,
   camera: "",
   lastRoom: "",
@@ -20,6 +21,7 @@ const defaultSettings = {
 
 try {
   const settings = JSON.parse(localStorage.getItem("settings") ?? "");
+  defaultSettings.autoAnswer = !!settings.autoAnswer;
   defaultSettings.autoSnapshot = !!settings.autoSnapshot;
   defaultSettings.camera = settings.camera;
   defaultSettings.lastRoom = settings.lastRoom || "";
@@ -38,6 +40,7 @@ export type ActionType =
   "setBool" |
   "setString";
 export type SettingName =
+  "autoAnswer" |
   "autoSnapshot" |
   "camera" |
   "lastRoom" |
@@ -231,6 +234,10 @@ export const Settings = () => {
           <legend>Options</legend>
           <input type="checkbox" name="auto-snapshot" id="settings-auto-snapshot" checked={settings.autoSnapshot} onChange={e => dispatch({ type: "setBool", name: "autoSnapshot", value: e.target.checked })} />
           <label htmlFor="settings-auto-snapshot">Automatically enable camera</label>
+          <div className="break" />
+
+          <input type="checkbox" name="auto-answer" id="settings-auto-answer" checked={settings.autoAnswer} onChange={e => dispatch({ type: "setBool", name: "autoAnswer", value: e.target.checked })} />
+          <label htmlFor="settings-auto-answer">Automatically answer incoming video chats</label>
           <div className="break" />
 
           <input type="checkbox" name="play-sounds" id="settings-play-sounds" checked={settings.playSounds} onChange={e => dispatch({ type: "setBool", name: "playSounds", value: e.target.checked})} />

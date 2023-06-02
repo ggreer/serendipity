@@ -437,7 +437,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   setupPeerConnection (pc: RTCPeerConnection, userId: UserId) {
-    //TODO: check if this already exists
+    if (this.pcs[userId]) {
+      console.error(`Peer connection for user id ${userId} already exists`);
+    }
     this.pcs[userId] = pc;
 
     pc.oniceconnectionstatechange = () => {
@@ -678,6 +680,19 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     });
   }
 
+  async answerVideo (user_id: UserId) {
+    const pc = this.pcs[user_id];
+    if (!pc) {
+      console.error(`no peer connection for ${user_id}`);
+      return;
+    }
+    const cameraStream = await this.startCamera();
+    this.playSelfVideo();
+    for (const track of cameraStream.getTracks()) {
+      pc.addTrack(track, cameraStream);
+    }
+  }
+
   async handleOfferVideo (ovi: OfferVideoInfo) {
     // someone wants to video chat with us
     if (ovi.from === this.state.id) {
@@ -689,12 +704,18 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       return;
     }
 
-    const cameraStream = await this.startCamera();
-    this.playSelfVideo();
-
     const pc = new RTCPeerConnection(config);
-    for (const track of cameraStream.getTracks()) {
-      pc.addTrack(track, cameraStream);
+
+    // If we're already video chatting, send our video & audio
+    if (this.state.videoState === "on" || this.context.autoAnswer) {
+      const cameraStream = await this.startCamera();
+      this.playSelfVideo();
+      for (const track of cameraStream.getTracks()) {
+        pc.addTrack(track, cameraStream);
+      }
+    } else {
+      const user = this.state.users[ovi.from];
+      this.notify(`${user.name} wants to video chat`);
     }
 
     this.setupPeerConnection(pc, ovi.from);
@@ -792,6 +813,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           const actions: Actions = {
             "kick": { icon: "⏏️", fn: () => this.kick(u)},
           };
+          if (u.mediaStream && videoState !== "on") {
+            actions.answer = { icon: "✅", fn: () => this.answerVideo(u.user_id) };
+            actions.hangup = { icon: "❌", fn: () => this.destroyPeerConnection(u.user_id) };
+          }
           if (u.muted) {
             actions.unmute = { icon: "🔊", fn: () => this.unmute(u) };
           } else {
