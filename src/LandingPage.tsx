@@ -32,7 +32,13 @@ export function LandingPage () {
 
     <h2>How it works</h2>
     <p>
-      Everyone who joins the same room sees a grayscale photo of each other that updates periodically. If anyone wants to chat with anyone else, they simply click on the image and video chat starts. There's no waiting for someone to answer the call. If this sounds crazy, well... that's how people interact in real life. The key is limiting access to people you trust: coworkers, friends, family, etc.
+      Everyone who joins the same room sees a grayscale photo of each other that updates periodically. If Alice wants to chat with Bob, she simply clicks on Bob's image and Bob will see and hear her. Bob can then answer the call, allowing Alice to see and hear him. If Bob is already video chatting with someone else, Alice will be joined automatically. In short: If you're not video chatting with anyone, you have to click a button before anyone can see your video or hear you.
+    </p>
+    <p>
+      If you're not video chatting with anyone, you will see color photos of anyone who is video chatting. You won't be able to hear them unless you join the discussion by clicking on one of their thumbnails.
+    </p>
+    <p>
+      If you want, you can enable auto-answering. That means when someone clicks on your image, you both see and hear each other immediately. There's no waiting for someone to answer the call. If this sounds crazy, well... that's how people interact in real life. The key is limiting access to people you trust: coworkers, friends, family, etc.
     </p>
 
     <form onSubmit={e => joinRoom(e)}>
