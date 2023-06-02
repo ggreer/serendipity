@@ -150,8 +150,14 @@ class Room {
       return;
     }
     if (from.group && to.group) {
-      // if both are in groups, join groups. that means a new command so that clients are on the same page and all start chats with each other
-      console.error("OMG they're both in different groups");
+      if (from.group === to.group) {
+        // they're already in the same group. do nothing. maybe sanity check that they're both in the actual group
+      } else {
+        // if both are in groups, join groups. that means a new command so that clients are on the same page and all start chats with each other
+        console.error("OMG they're both in different groups", from.group, to.group);
+        throw new Error("NEED TO FIX THIS");
+        // options: make them leave the group. combine groups
+      }
     } else if (from.group) {
       // if from is in a group but to isn't, to join's from's group
       this.groups[from.group].push(to.id);
