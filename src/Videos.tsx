@@ -691,6 +691,19 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     for (const track of cameraStream.getTracks()) {
       pc.addTrack(track, cameraStream);
     }
+
+    this.setupPeerConnection(pc, user_id);
+    pc.onnegotiationneeded = async () => {
+      await pc.setLocalDescription();
+      this.socket.send({
+        cmd: "accept_video",
+        data: {
+          from: this.state.id, // server ignores this
+          to: user_id ?? "",
+          pc_description: JSON.stringify(pc.localDescription),
+        }
+      });
+    };
   }
 
   async handleOfferVideo (ovi: OfferVideoInfo) {
