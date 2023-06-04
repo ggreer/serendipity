@@ -822,7 +822,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     let userContent = <>Connecting...</>;
     if (id && me) {
       userContent = <>
-        <UserTile user={me} isSelf={true} actions={{}} onClick={() => this.startSnapshots()} />
+        <UserTile key={me.user_id} user={me} isSelf={true} actions={{}} onClick={() => this.startSnapshots()} />
         { Object.values(users).map((u, i) => {
           if (u.user_id === id) {
             return <span key={u.user_id}></span>;
@@ -839,7 +839,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
           } else {
             actions.mute = { icon: "🔇", fn: () => this.mute(u) };
           }
-          return <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} actions={actions} />
+          return <UserTile key={u.user_id} user={u} isSelf={u.user_id === id} onClick={() => this.toggleVideo(u)} actions={actions} />;
         })}
       </>;
     }
@@ -912,7 +912,7 @@ const UserTile = ({ user, isSelf, onClick, actions }: UserTileProps) => {
       onClick={onClick}
     />
     { user.name } { isSelf ? <span style={{ float: "right" }}>(You)</span> : "" }
-    { Object.entries(actions).map(([name, v]) => <button type="button" title={name} onClick={v.fn}>{v.icon}</button>)}
+    { Object.entries(actions).map(([name, v]) => <button key={name} type="button" title={name} onClick={v.fn}>{v.icon}</button>)}
   </div>;
 };
 
