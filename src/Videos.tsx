@@ -425,7 +425,10 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       }
     });
 
-    // TODO: stop video chats that we're in
+    // stop video chats that we're in
+    for (const userId of Object.keys(this.pcs)) {
+      this.destroyPeerConnection(userId);
+    }
 
     // clear latest snapshot for everyone else
     this.socket.send({
