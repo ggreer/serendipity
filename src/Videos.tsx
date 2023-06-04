@@ -329,9 +329,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     canvas.height = video_height/2;
     context.drawImage(this.videoSelfRef.current, 0, 0, canvas.width, canvas.height);
     // Send color if video chatting, grayscale if not
-    if (videoState === "on") {
-      console.log("color");
-    } else {
+    if (videoState !== "on") {
       const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
       for (let i = 0; i < data.length; i += 4) {
