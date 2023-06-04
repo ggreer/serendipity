@@ -441,7 +441,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
     this.pcs[userId] = pc;
 
     pc.oniceconnectionstatechange = () => {
-      console.log("ice connection state change", pc.iceConnectionState);
+      console.log("ice connection state change", userId, pc.iceConnectionState);
       if (pc.iceConnectionState === "failed") {
         console.warn("failed. restarting ice");
         pc.restartIce();
@@ -454,6 +454,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       }
     };
     pc.onicecandidate = ({ candidate }) => {
+      console.log("ice candidate", userId, candidate);
       if (!candidate) {
         console.log("no candidate");
         return;
@@ -468,9 +469,9 @@ export class Videos extends React.Component<VideosProps, VideosState> {
       });
     };
     pc.ontrack = ({ track, streams }) => {
-      console.log("new track", track, "streams:", streams);
+      console.log("new track", userId, track, "streams:", streams);
       track.onunmute = () => {
-        console.log("unmuted track", track);
+        console.log("unmuted track", userId, track);
         // only play the sound once
         if (track.kind === "audio" && this.context.playSounds) {
           playStartVideo();
@@ -598,7 +599,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
             pc_description: JSON.stringify(pc.localDescription),
           }
         });
-      }
+      };
     }
   }
 
@@ -679,6 +680,7 @@ export class Videos extends React.Component<VideosProps, VideosState> {
   }
 
   async answerVideo (user_id: UserId) {
+    console.log(`answering video for ${user_id}`);
     const pc = this.pcs[user_id];
     if (!pc) {
       console.error(`no peer connection for ${user_id}`);

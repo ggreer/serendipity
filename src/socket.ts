@@ -82,7 +82,9 @@ export class Socket {
       console.debug(ws.readyState, "queued", msg);
       return;
     }
-    console.debug("sending", msg);
+    if (msg.cmd !== "snapshot") {
+      console.debug("sending", msg);
+    }
     ws.send(JSON.stringify({ ...msg, req_id: `req_${this.wsReqId++}`, }));
   }
 
@@ -92,7 +94,9 @@ export class Socket {
       console.debug("No handler for", msg);
       return;
     }
-    console.debug("got", msg);
+    if (msg.cmd !== "snapshot") {
+      console.debug("got", msg);
+    }
     try {
       this.handler(msg);
     } catch (e) {
