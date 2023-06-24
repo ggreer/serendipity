@@ -1,9 +1,11 @@
-# Serendipity (working title)
+# Serendipity Video Chat
 
-Dependencies: yarn, node.js.
+See it in action at [https://video.greer.fm/](https://video.greer.fm/)
 
 
 ### Local development
+
+Dependencies: yarn, node.js.
 
 Run `yarn` to install NPM dependencies. To start the backend server, run `yarn server` in one console. To start the frontend, run `yarn start`.
 
