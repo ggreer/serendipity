@@ -23,7 +23,6 @@ import type {
   StopVideoInfo,
   User,
   UserId,
-  UserInfo,
   UserJoinInfo,
   UserLeaveInfo,
   VideoChatGroups,
