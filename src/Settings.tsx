@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useReducer, useRef } from 'react';
+import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 
 import { Permissions, onPermissionChange } from './Permissions';
 import { playTestSound } from './sounds';
@@ -19,12 +20,20 @@ const defaultSettings = {
   timeLapse: false,
 };
 
+function generateRoomName (): string {
+  return uniqueNamesGenerator(
+    {
+      dictionaries: [adjectives, colors, animals],
+      separator: '-',
+    });
+}
+
 try {
   const settings = JSON.parse(localStorage.getItem("settings") ?? "");
   defaultSettings.autoAnswer = !!settings.autoAnswer;
   defaultSettings.autoSnapshot = !!settings.autoSnapshot;
   defaultSettings.camera = settings.camera;
-  defaultSettings.lastRoom = settings.lastRoom || "";
+  defaultSettings.lastRoom = settings.lastRoom || generateRoomName();
   defaultSettings.microphone = settings.microphone;
   defaultSettings.name = settings.name || "";
   defaultSettings.notifications = !!settings.notifications;
@@ -256,7 +265,7 @@ export const Settings = () => {
           </select>
           <div className="break" />
 
-          <label htmlFor="settings-microphone-select">🎤 Microphone&nbsp;<MicTest /></label>
+          <label htmlFor="settings-microphone-select">🎤 Microphone&nbsp;{ isOpen && <MicTest /> }</label>
           <select name="microphone" id="settings-microphone-select" value={settings.microphone} onChange={e => dispatch({ type: "setString", name: "microphone", value: e.target.value})}>
             { microphones }
           </select>
